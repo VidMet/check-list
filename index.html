@@ -226,17 +226,9 @@ async function taBilde(punktId) {
   
   try {
     if (API && API.viewer) {
-      let base64;
+      // Den korrekte metoden i Workspace API-et er getSnapshot()
+      const base64 = await API.viewer.getSnapshot();
       
-      // Sjekker hvilken metode som faktisk er tilgjengelig i API-et
-      if (typeof API.viewer.getScreenshot === 'function') {
-        base64 = await API.viewer.getScreenshot();
-      } else if (typeof API.viewer.captureScreenshot === 'function') {
-        base64 = await API.viewer.captureScreenshot();
-      } else {
-        throw new Error("Fant ingen støttet skjermbilde-metode i API.viewer");
-      }
-
       img.src = base64;
       ramme.style.display = 'block';
       ksData[punktId].bilde = base64;
