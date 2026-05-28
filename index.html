@@ -77,7 +77,15 @@
   <select id="fagFilter">
     <option value="">Laster fag...</option>
   </select>
+  
+  <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px; padding:6px; font-family:var(--sans); border:1px solid var(--border); border-radius:4px;">
+  <button class="btn btn-secondary" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Signer Egen</button>
+  <button class="btn btn-secondary" onclick="signerSkjema('fagkontroll')" style="background:#dcfce7; border-color:#166534;">✍️ Signer Fag</button>
+  
   <button class="btn" onclick="eksporterKort()">📄 Forenklet PDF</button>
+</div>
+
+<div id="signaturInfo" style="padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono);">
 </div>
 
 <div id="statusBar">Venter på tilkobling...</div>
@@ -240,6 +248,47 @@ async function taBilde(punktId) {
   } catch (e) {
     console.error("Feil ved skjermbilde:", e);
     alert("Kunne ikke ta bilde fra 3D-modellen. Sjekk konsollen (F12) for detaljer.\nFeilmelding: " + e.message);
+  }
+}
+
+// Nytt objekt for å holde på signaturer
+let signaturData = { egenkontroll: null, fagkontroll: null };
+
+function signerSkjema(type) {
+  const initialer = $('brukerInitialer').value.trim();
+  
+  if (!initialer) {
+    alert("Vennligst skriv inn initialene dine i tekstfeltet før du signerer.");
+    return;
+  }
+  
+  // Henter nøyaktig dato og tid
+  const dato = new Date().toLocaleString('no-NB', { 
+    year: 'numeric', month: '2-digit', day: '2-digit', 
+    hour: '2-digit', minute: '2-digit' 
+  });
+  
+  // Lagrer signaturen i minnet
+  signaturData[type] = { initialer: initialer, dato: dato };
+  
+  oppdaterSignaturVisning();
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+}
+
+function oppdaterSignaturVisning() {
+  const boks = $('signaturInfo');
+  let tekst = [];
+  
+  if (signaturData.egenkontroll) {
+    tekst.push(`✅ Egenkontroll utført av: <strong>${signaturData.egenkontroll.initialer}</strong> (${signaturData.egenkontroll.dato})`);
+  }
+  if (signaturData.fagkontroll) {
+    tekst.push(`✅ Fagkontroll godkjent av: <strong>${signaturData.fagkontroll.initialer}</strong> (${signaturData.fagkontroll.dato})`);
+  }
+  
+  if (tekst.length > 0) {
+    boks.innerHTML = tekst.join('&nbsp;&nbsp; | &nbsp;&nbsp;');
+    boks.style.display = 'block';
   }
 }
 
