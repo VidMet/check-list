@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.6</title>
+  <title>Modellkontroll v2.7</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -113,7 +113,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.6</span></h1>
+    <h1>Modellkontroll <span class="version">v2.7</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -207,8 +207,6 @@ let signaturData = {};
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
-
-// Hjelpefunksjon for filnavn
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
 
 async function init() {
@@ -243,42 +241,42 @@ async function init() {
   }
 }
 
-// NY OG ROBUST MODELLSCAN BASERT PÅ MENGDEUTTAK-SKRIPTET
+// IDENTISK MODELLSCAN SOM I EGENSKAPSVALIDERING
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
   
   try {
     if (API && API.viewer) {
-      // 1. Bygg et kart med gode filnavn for alle modeller knyttet til visningen/prosjektet
       const nameMap = new Map();
-      const srcs = [() => API.models && API.models.getModels(), () => API.viewer && API.viewer.getModels()];
+      const srcs = [() => API.models?.getModels(), () => API.viewer?.getModels()];
+      
       for (const src of srcs) {
-        if (!src) continue;
         try {
           const res = await src();
           const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
           list.forEach(m => {
             const id = m.id || m.modelId;
-            const fn = [m.name, m.fileName, m.filename].find(v => v && /\\.ifc/i.test(v)) || m.name;
+            const fn = [m.name, m.fileName, m.filename].find(v => /\.ifc/i.test(v));
             if (id && fn) nameMap.set(id, lastPathPart(fn));
           });
-        } catch(e) {}
+        } catch(e){}
       }
 
-      // 2. Kaller getObjects() for å hente KUN de modellene som faktisk er lastet med geometri i vieweren akkurat nå
-      const loadedModels = await API.viewer.getObjects();
+      const objs = await API.viewer.getObjects();
       
-      tilgjengeligeModeller = [];
-      if (loadedModels && loadedModels.length > 0) {
-        loadedModels.forEach(model => {
-          const mid = model.modelId || model.modelid || model.id;
-          if (mid) {
-            let modelName = nameMap.get(mid) || model.name || `Modell_${String(mid).substring(0,6)}`;
-            tilgjengeligeModeller.push({ id: mid, name: modelName });
-          }
-        });
-      }
+      const gyldigeModeller = (objs || []).map(m => {
+        const mid = m.modelId || m.modelid;
+        const objects = m.objects || [];
+        return {
+          id: mid,
+          name: nameMap.get(mid) || m.name || 'Ukjent modell',
+          antallObjekter: objects.length
+        };
+      }).filter(m => m.antallObjekter > 0); 
+
+      tilgjengeligeModeller = gyldigeModeller.map(m => ({ id: m.id, name: m.name }));
+
     } else {
       // Fallback lokalt
       tilgjengeligeModeller = [
@@ -287,7 +285,6 @@ async function hentModeller() {
       ];
     }
     
-    // Auto-kryss av de faktiske loaded-modellene
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
     tegnModellListe();
     
@@ -309,7 +306,7 @@ function tegnModellListe() {
   container.innerHTML = '';
   
   if(tilgjengeligeModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller er lastet inn i 3D-visningen akkurat nå.</span>';
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen akkurat nå.</span>';
     return;
   }
   
@@ -600,11 +597,20 @@ function validerAktivFase() {
   return !harFeil;
 }
 
+// HELGARDERT BILDE-FUNKSJON
 async function taBilde(punktId) {
   try {
     let base64;
-    if (API && API.viewer && typeof API.viewer.getSnapshot === 'function') {
-      base64 = await API.viewer.getSnapshot();
+    if (API && API.viewer) {
+      if (typeof API.viewer.getSnapshot === 'function') {
+        base64 = await API.viewer.getSnapshot();
+      } else if (typeof API.viewer.getScreenshot === 'function') {
+        base64 = await API.viewer.getScreenshot();
+      } else if (typeof API.viewer.captureScreenshot === 'function') {
+        base64 = await API.viewer.captureScreenshot();
+      } else {
+        throw new Error("Fant ingen kompatibel skjermbildemetode i API-et.");
+      }
     } else {
       const canvas = document.createElement('canvas');
       canvas.width = 300; canvas.height = 150;
@@ -622,7 +628,7 @@ async function taBilde(punktId) {
     setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
   } catch (e) {
     console.error("Feil ved bilde", e);
-    alert("Kunne ikke ta bilde: " + e.message);
+    alert("Kunne ikke ta bilde. Feilmelding: " + e.message);
   }
 }
 
