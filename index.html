@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.5</title>
+  <title>Modellkontroll v2.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -113,7 +113,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.5</span></h1>
+    <h1>Modellkontroll <span class="version">v2.6</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -208,6 +208,9 @@ let signaturData = {};
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 
+// Hjelpefunksjon for filnavn
+const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
+
 async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
@@ -240,26 +243,51 @@ async function init() {
   }
 }
 
-// STRENGERE MODELLSCAN
+// NY OG ROBUST MODELLSCAN BASERT PÅ MENGDEUTTAK-SKRIPTET
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
   
   try {
     if (API && API.viewer) {
-      const models = await API.viewer.getModels();
-      // KUN modeller hvor visible bekreftes som TRUE blir med (ikke undefined/false)
-      tilgjengeligeModeller = models
-        .filter(m => m.visible === true)
-        .map(m => ({ id: m.modelId || m.id, name: m.name }));
+      // 1. Bygg et kart med gode filnavn for alle modeller knyttet til visningen/prosjektet
+      const nameMap = new Map();
+      const srcs = [() => API.models && API.models.getModels(), () => API.viewer && API.viewer.getModels()];
+      for (const src of srcs) {
+        if (!src) continue;
+        try {
+          const res = await src();
+          const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
+          list.forEach(m => {
+            const id = m.id || m.modelId;
+            const fn = [m.name, m.fileName, m.filename].find(v => v && /\\.ifc/i.test(v)) || m.name;
+            if (id && fn) nameMap.set(id, lastPathPart(fn));
+          });
+        } catch(e) {}
+      }
+
+      // 2. Kaller getObjects() for å hente KUN de modellene som faktisk er lastet med geometri i vieweren akkurat nå
+      const loadedModels = await API.viewer.getObjects();
+      
+      tilgjengeligeModeller = [];
+      if (loadedModels && loadedModels.length > 0) {
+        loadedModels.forEach(model => {
+          const mid = model.modelId || model.modelid || model.id;
+          if (mid) {
+            let modelName = nameMap.get(mid) || model.name || `Modell_${String(mid).substring(0,6)}`;
+            tilgjengeligeModeller.push({ id: mid, name: modelName });
+          }
+        });
+      }
     } else {
-      // Fallback lokalt for testing
+      // Fallback lokalt
       tilgjengeligeModeller = [
         {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, 
         {id: 'm2', name: 'E6_Rekkverk.ifc'}
       ];
     }
     
+    // Auto-kryss av de faktiske loaded-modellene
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
     tegnModellListe();
     
@@ -271,7 +299,7 @@ async function hentModeller() {
     setTimeout(() => { scanBtn.innerText = '🔍 Skann 3D-visning på nytt'; }, 3000);
     
   } catch(e) {
-    console.error("Kunne ikke hente modeller", e);
+    console.error("Feil under henting av modeller", e);
     scanBtn.innerText = '❌ Feil ved skann';
   }
 }
@@ -281,7 +309,7 @@ function tegnModellListe() {
   container.innerHTML = '';
   
   if(tilgjengeligeModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen akkurat nå.</span>';
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller er lastet inn i 3D-visningen akkurat nå.</span>';
     return;
   }
   
@@ -392,7 +420,6 @@ function leggTilFrittPunkt() {
   }, 100);
 }
 
-// NY FUNKSJON: Slette fritt punkt
 function slettFrittPunkt(punktId) {
   if(!confirm("Er du sikker på at du vil slette dette egendefinerte punktet?")) return;
   
@@ -400,7 +427,6 @@ function slettFrittPunkt(punktId) {
   if(egendefKat) {
     egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
     
-    // Fjern hele kategorien hvis den blir tom
     if(egendefKat.punkter.length === 0) {
       strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte punkter");
     }
@@ -445,7 +471,6 @@ function tegnKategorier() {
       const tittel = document.createElement('div');
       tittel.className = 'punkt-tekst-tittel';
       
-      // Legg til sletteknapp HVIS det er et fritt punkt
       if (pkt.id.startsWith('fri_')) {
         tittel.innerHTML = `<span>${index + 1}. ${pkt.tekst}</span> <button class="slett-btn" onclick="slettFrittPunkt('${pkt.id}')">🗑️ Slett</button>`;
       } else {
