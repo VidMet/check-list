@@ -6,9 +6,9 @@
         "navn": "Generelle kontrollpunkter",
         "punkter": [
           {"id": "v_gen_1", "tekst": "Er alle styrende dokumenter blitt identifisert (relevante håndbøker, konkurransegrunnlaget, kommunale normer, reguleringsplankart, reguleringsplanbestemmelser, tunnelsikkerhetsforskriften osv.)?"},
-          {"id": "v_gen_2", "tekst": "Er alle krav i konkurransegrunnlaget gjennomgått ogivaretatt ved prosjektering?"}
-          {"id": "v_gen_3", "tekst": "Har plassering av veganlegget blitt sjekket i forhold tilreguleringsplan?"}
-          {"id": "v_gen_4", "tekst": "Har reguleringsplanbestemmelser blitt sjekket?"}
+          {"id": "v_gen_2", "tekst": "Er alle krav i konkurransegrunnlaget gjennomgått ogivaretatt ved prosjektering?"},
+          {"id": "v_gen_3", "tekst": "Har plassering av veganlegget blitt sjekket i forhold tilreguleringsplan?"},
+          {"id": "v_gen_4", "tekst": "Har reguleringsplanbestemmelser blitt sjekket?"},
           {"id": "v_gen_5", "tekst": "Er alle relevante foreliggende fravikssøknader identifisert?"}
         ]
       },
