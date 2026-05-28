@@ -2,299 +2,259 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v1.0</title>
+  <title>KS-Verktøy Trimble</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700&display=swap');
 
     :root {
-      --bg:        #f3f4f6;      
-      --surface:   #ffffff;      
-      --surface2:  #e5e7eb;      
-      --border:    #d1d5db;      
-      --ink:       #111827;      
-      --muted:     #6b7280;      
-      
-      --green:     #166534;      
-      --green-dim: #dcfce7;
-      --blue:      #1d4ed8;      
-      --blue-dim:  #dbeafe;
-      
-      --mono:      'JetBrains Mono', monospace;
-      --sans:      'Syne', sans-serif;
+      --bg: #f3f4f6; --surface: #ffffff; --surface2: #e5e7eb; --border: #d1d5db; 
+      --ink: #111827; --muted: #6b7280; --blue: #1d4ed8; --blue-dim: #dbeafe;
+      --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
-    html, body {
-      background: var(--bg); color: var(--ink); font-family: var(--sans);
-      height: 100%; display: flex; flex-direction: column; overflow: hidden;
-    }
-
-    header {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-    }
-
-    .header-title { flex: 1; }
-    .header-title h1 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .header-title h1 .version { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
-    .header-title p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
-
-    .btn { font-family: var(--sans); font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; transition: opacity .15s; }
-    .btn:not(:disabled):hover { opacity: .85; }
-    .btn-primary { background: var(--blue); color: #ffffff; }
-    .btn-secondary { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
-    .btn-small { font-size: 11px; padding: 5px 10px; border-radius: 4px; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .header-info h1 { font-size: 16px; font-weight: 700; }
+    .header-info p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
     
-    #filterBar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 15px; align-items: center; flex-shrink: 0; }
-    .filter-group { display: flex; align-items: center; gap: 8px; }
-    .filter-group label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-    .filter-group select { font-family: var(--mono); font-size: 12px; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; }
+    .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 15px; align-items: center; flex-shrink: 0; }
+    .toolbar select, .btn { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; }
+    .btn:hover { background: var(--border); }
+    .btn-primary { background: var(--blue); color: white; border: none; }
+    .btn-primary:hover { background: #1e40af; }
 
-    #statusBar { font-family: var(--mono); font-size: 11px; padding: 6px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); }
+    #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); }
 
-    main { flex: 1 1 auto; overflow-y: auto; padding: 16px; }
+    main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    /* Sjekkliste UI */
-    .report-container { max-width: 800px; margin: 0 auto; background: var(--surface); padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
-    .report-header { border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 20px; }
+    /* Trekkspill-kategorier (Accordion) */
+    .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+    .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+    .kategori-header:hover { background: #d1d5db; }
+    .kategori-body { display: none; flex-direction: column; }
     
-    .sjekk-panel { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; overflow: hidden; }
-    .sjekk-header { background: var(--surface2); padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
-    .sjekk-header input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; cursor: pointer; }
-    .sjekk-tittel { font-size: 14px; font-weight: 600; flex: 1; }
+    /* Enkeltlinje-designet */
+    .punkt-container { border-top: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; background: var(--surface); }
+    .punkt-rad { display: grid; grid-template-columns: 140px 1fr 200px 32px; gap: 12px; align-items: center; }
     
-    .sjekk-body { padding: 14px; background: var(--surface); display: flex; flex-direction: column; gap: 10px; }
-    .sjekk-body textarea { width: 100%; min-height: 60px; font-family: var(--sans); font-size: 13px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; resize: vertical; }
+    .status-velger { font-size: 11px; font-family: var(--mono); padding: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+    .status-velger.egenkontroll { background: #fef08a; border-color: #ca8a04; }
+    .status-velger.fagkontroll { background: #dcfce7; border-color: #166534; }
+    .status-velger.ir { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
     
-    .bilde-container { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-    .screenshot-img { max-width: 100%; max-height: 300px; border: 1px solid var(--border); border-radius: 4px; display: none; }
+    .punkt-tekst { font-size: 12px; line-height: 1.4; }
+    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; }
+    
+    .kamera-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.6; transition: opacity 0.2s; }
+    .kamera-btn:hover { opacity: 1; }
+    
+    .bilde-ramme { margin-top: 8px; display: none; border-left: 2px solid var(--blue); padding-left: 10px; }
+    .bilde-ramme img { max-height: 200px; border: 1px solid var(--border); border-radius: 4px; }
+    
+    .cloud-sync { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--green); font-family: var(--mono); font-weight: bold; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="header-title">
-    <h1>Modellkontroll <span class="version">v1.0</span></h1>
-    <p>Sjekklister og avvikshåndtering</p>
+  <div class="header-info">
+    <h1>Kvalitetskontroll BIM</h1>
+    <p>Prosjektoppsett</p>
   </div>
-  <button class="btn btn-secondary" onclick="eksporterTilWord()">📝 Eksport Word</button>
-  <button class="btn btn-primary" onclick="eksporterTilPDF()">📄 Eksport PDF</button>
+  <div class="cloud-sync">
+    <span id="syncStatus">🟢 Lese-modus</span>
+    <button class="btn btn-primary" onclick="lagreTilProsjekt()">☁️ Lagre til Trimble</button>
+  </div>
 </header>
 
-<div id="filterBar">
-  <div class="filter-group">
-    <label for="fagFilter">Velg Fag:</label>
-    <select id="fagFilter">
-      <option value="veg">Veg</option>
-      <option value="rekkverk">Vegutstyr rekkverk</option>
-    </select>
-  </div>
+<div class="toolbar">
+  <select id="fagFilter">
+    <option value="">Laster fag...</option>
+  </select>
+  <button class="btn" onclick="eksporterKort()">📄 Forenklet PDF</button>
 </div>
 
-<div id="statusBar">Kobler til Trimble Connect...</div>
+<div id="statusBar">Venter på tilkobling...</div>
 
-<main>
-  <div id="reportContent" class="report-container">
-    <div class="report-header">
-      <h2 id="reportTitle">Modellkontroll: Veg</h2>
-      <p style="font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px;" id="reportDate"></p>
-    </div>
-    
-    <div id="sjekklisteContainer">
-      </div>
-  </div>
-</main>
+<main id="listeInnhold">
+  </main>
 
 <script>
 let API = null;
-
-// Datastruktur for fag og tilhørende sjekkpunkter
-const fagsjekkListe = {
-  "veg": {
-    navn: "Veg",
-    punkter: [
-      { id: "v1", tekst: "Senterlinje er korrekt plassert iht. tverrprofil" },
-      { id: "v2", tekst: "Tverrfall er riktig i kurver og fyllinger" },
-      { id: "v3", tekst: "Vegoppbygging (lagtykkelser) stemmer overens med krav" },
-      { id: "v4", tekst: "MMI-nivå og koding (prosesskoder) på vegobjekter er lagt inn" }
-    ]
-  },
-  "rekkverk": {
-    navn: "Vegutstyr rekkverk",
-    punkter: [
-      { id: "r1", tekst: "Avstand fra rekkverk til vegkant er iht. regelverk (N101)" },
-      { id: "r2", tekst: "Arbeidsbredde på rekkverket er hensyntatt" },
-      { id: "r3", tekst: "Rekkverksender er forankret eller har energiabsorberende terminal" },
-      { id: "r4", tekst: "Korrekt prosesskode er lagt inn på utstyret" }
-    ]
-  }
-};
-
-// Objekt for å lagre brukerens inndata underveis (så det ikke slettes når man bytter fag)
-const lagretData = {};
+let strukturData = null; // Holder data fra sjekklister.json
+let ksData = {};         // Holder status, kommentarer og bilder for punktene
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 
-async function connect(){
+async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
-    setStatus('✅ Tilkoblet Trimble Connect.');
-  } catch(e) { 
-    setStatus('⚠️ Kjører utenfor Trimble Connect (Skjermbilde-testmodus).'); 
+    setStatus('✅ Tilkoblet Trimble Connect Workspace');
+  } catch(e) {
+    setStatus('⚠️ Kjører frittstående (Utenfor Trimble)');
+  }
+  
+  // Last inn JSON-struktur
+  try {
+    const response = await fetch('sjekklister.json');
+    strukturData = await response.json();
+    oppdaterFagDropdown();
+  } catch(e) {
+    setStatus('❌ Kunne ikke laste sjekklister.json. Sjekk at den ligger i samme mappe.');
   }
 }
 
-// Generer skjemaet basert på valgt fag
-function tegnSjekkliste(fagNokkel) {
-  const fagData = fagsjekkListe[fagNokkel];
-  $('reportTitle').innerText = `Modellkontroll: ${fagData.navn}`;
-  
-  const dato = new Date().toLocaleDateString('no-NB', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-  $('reportDate').innerText = `Utført: ${dato}`;
+function oppdaterFagDropdown() {
+  const select = $('fagFilter');
+  select.innerHTML = '';
+  for (const fagNokkel in strukturData) {
+    const opt = document.createElement('option');
+    opt.value = fagNokkel;
+    opt.innerText = strukturData[fagNokkel].navn;
+    select.appendChild(opt);
+  }
+  // Lytt på endringer
+  select.addEventListener('change', (e) => tegnKategorier(e.target.value));
+  // Tegn første fag
+  if (Object.keys(strukturData).length > 0) {
+    tegnKategorier(Object.keys(strukturData)[0]);
+  }
+}
 
-  const container = $('sjekklisteContainer');
-  container.innerHTML = '';
+function tegnKategorier(fagNokkel) {
+  const main = $('listeInnhold');
+  main.innerHTML = '';
+  const kategorier = strukturData[fagNokkel].kategorier;
 
-  fagData.punkter.forEach((punkt, index) => {
-    // Initialiser lagring for dette punktet hvis det ikke finnes
-    if (!lagretData[punkt.id]) {
-      lagretData[punkt.id] = { godkjent: false, kommentar: "", bilde: null };
-    }
-    const data = lagretData[punkt.id];
-
+  kategorier.forEach(kat => {
     const panel = document.createElement('div');
-    panel.className = 'sjekk-panel';
+    panel.className = 'kategori-panel';
+    
+    // Header for trekkspill
+    const header = document.createElement('div');
+    header.className = 'kategori-header';
+    header.innerHTML = `<span>▶ ${kat.navn}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${kat.punkter.length} punkter</span>`;
+    
+    const body = document.createElement('div');
+    body.className = 'kategori-body';
 
-    panel.innerHTML = `
-      <div class="sjekk-header">
-        <input type="checkbox" id="check_${punkt.id}" ${data.godkjent ? 'checked' : ''}>
-        <div class="sjekk-tittel">${index + 1}. ${punkt.tekst}</div>
-      </div>
-      <div class="sjekk-body">
-        <textarea id="kommentar_${punkt.id}" placeholder="Legg til kommentar her...">${data.kommentar}</textarea>
-        
-        <div class="bilde-container">
-          <button class="btn btn-secondary btn-small" onclick="taSkjermbilde('${punkt.id}')">📷 Ta skjermbilde fra 3D-modell</button>
-          <img id="bilde_${punkt.id}" class="screenshot-img" src="${data.bilde || ''}" style="display: ${data.bilde ? 'block' : 'none'};">
+    // Tegn selve linjene (punktene)
+    kat.punkter.forEach(pkt => {
+      // Sørg for at punktet finnes i ksData for lagring av tilstand
+      if (!ksData[pkt.id]) ksData[pkt.id] = { status: 'Ubehandlet', kommentar: '', bilde: null };
+      const lagret = ksData[pkt.id];
+
+      const pktContainer = document.createElement('div');
+      pktContainer.className = 'punkt-container';
+
+      pktContainer.innerHTML = `
+        <div class="punkt-rad">
+          <select class="status-velger" id="status_${pkt.id}">
+            <option value="Ubehandlet" ${lagret.status === 'Ubehandlet' ? 'selected' : ''}>- Ikke vurdert -</option>
+            <option value="IR" ${lagret.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
+            <option value="Egenkontroll" ${lagret.status === 'Egenkontroll' ? 'selected' : ''}>Egenkontroll OK</option>
+            <option value="Fagkontroll" ${lagret.status === 'Fagkontroll' ? 'selected' : ''}>Fagkontroll OK</option>
+          </select>
+          
+          <div class="punkt-tekst">${pkt.tekst}</div>
+          
+          <input type="text" class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Kommentar..." value="${lagret.kommentar}">
+          
+          <button class="kamera-btn" onclick="taBilde('${pkt.id}')" title="Ta skjermbilde fra 3D">📷</button>
         </div>
-      </div>
-    `;
-    container.appendChild(panel);
+        
+        <div class="bilde-ramme" id="ramme_${pkt.id}" style="display: ${lagret.bilde ? 'block' : 'none'};">
+          <img id="bilde_${pkt.id}" src="${lagret.bilde || ''}">
+        </div>
+      `;
+      body.appendChild(pktContainer);
+    });
 
-    // Lagre endringer fortløpende
-    $(`check_${punkt.id}`).addEventListener('change', (e) => data.godkjent = e.target.checked);
-    $(`kommentar_${punkt.id}`).addEventListener('input', (e) => data.kommentar = e.target.value);
+    // Event listeners for å oppdatere state og farger dynamisk (settes etter HTML er lagt til DOM)
+    panel.appendChild(header);
+    panel.appendChild(body);
+    main.appendChild(panel);
+
+    // Trekkspill-logikk
+    header.addEventListener('click', () => {
+      const isOpen = body.style.display === 'flex';
+      body.style.display = isOpen ? 'none' : 'flex';
+      header.querySelector('span').innerText = `${isOpen ? '▶' : '▼'} ${kat.navn}`;
+    });
+
+    // Logikk for inputfelt
+    kat.punkter.forEach(pkt => {
+      const sel = $(`status_${pkt.id}`);
+      const oppdaterFarge = () => {
+        sel.className = 'status-velger';
+        if (sel.value === 'Egenkontroll') sel.classList.add('egenkontroll');
+        if (sel.value === 'Fagkontroll') sel.classList.add('fagkontroll');
+        if (sel.value === 'IR') sel.classList.add('ir');
+        ksData[pkt.id].status = sel.value;
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      };
+      
+      sel.addEventListener('change', oppdaterFarge);
+      oppdaterFarge(); // Sett farge ved innlasting
+
+      $(`komm_${pkt.id}`).addEventListener('input', (e) => {
+        ksData[pkt.id].kommentar = e.target.value;
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      });
+    });
   });
 }
 
-// Funksjon for å ta skjermbilde
-async function taSkjermbilde(punktId) {
-  const imgElement = $(`bilde_${punktId}`);
-  setStatus('⏳ Tar skjermbilde...');
+async function taBilde(punktId) {
+  const ramme = $(`ramme_${punktId}`);
+  const img = $(`bilde_${punktId}`);
   
   try {
     if (API && API.viewer) {
-      // Kall mot Trimble Connect API
-      const bildeBase64 = await API.viewer.getScreenshot(); 
-      // Merk: getScreenshot() metoden kan variere litt i returformat avhengig av API-versjon.
-      // Den returnerer typisk en 'data:image/png;base64,...' streng.
-      imgElement.src = bildeBase64;
-      imgElement.style.display = 'block';
-      lagretData[punktId].bilde = bildeBase64;
-      setStatus('✅ Skjermbilde lagret på punktet.');
+      const base64 = await API.viewer.getScreenshot();
+      img.src = base64;
+      ramme.style.display = 'block';
+      ksData[punktId].bilde = base64;
+      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      setStatus(`📷 Bilde lagret for punkt.`);
     } else {
-      throw new Error("Ikke i Trimble");
+      throw new Error("Mangler Trimble API");
     }
-  } catch (error) {
-    // Fallback hvis man tester lokalt i nettleseren (Lager en grå demonstrasjonsboks)
+  } catch (e) {
+    // Fallback for lokal testing
     const canvas = document.createElement('canvas');
-    canvas.width = 600; canvas.height = 300;
+    canvas.width = 400; canvas.height = 200;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#e5e7eb'; ctx.fillRect(0, 0, 600, 300);
-    ctx.fillStyle = '#6b7280'; ctx.font = '20px Syne'; ctx.fillText('Demonstrasjonsbilde (Utenfor Trimble)', 120, 150);
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,400,200);
+    ctx.fillStyle = '#0f172a'; ctx.font = '14px sans-serif'; ctx.fillText('Demo: Bilde fra 3D-visning', 110, 105);
     
-    const mockImage = canvas.toDataURL('image/png');
-    imgElement.src = mockImage;
-    imgElement.style.display = 'block';
-    lagretData[punktId].bilde = mockImage;
-    setStatus('⚠️ Lagt inn test-bilde (Kjører lokalt).');
+    img.src = canvas.toDataURL();
+    ramme.style.display = 'block';
+    ksData[punktId].bilde = img.src;
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
   }
 }
 
-// PDF Eksport
-function eksporterTilPDF() {
-  const element = $('reportContent');
-  const fagNavn = fagsjekkListe[$('fagFilter').value].navn;
-  const dato = new Date().toISOString().slice(0, 10);
-  
-  const opt = {
-    margin:       10,
-    filename:     `Modellkontroll_${fagNavn}_${dato}.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2 },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-
-  setStatus('⏳ Genererer PDF...');
-  html2pdf().set(opt).from(element).save().then(() => {
-    setStatus('✅ PDF eksportert.');
-  });
+function lagreTilProsjekt() {
+  // Her vil Trimble File API (eller Extension API) koden implementeres for å skrive ksData til skyen.
+  // Som demonstrasjon simulerer vi en opplasting.
+  $('syncStatus').innerText = '⏳ Synkroniserer...';
+  setTimeout(() => {
+    $('syncStatus').innerText = '🟢 Synkronisert med Trimble';
+    setStatus('Skjema lagret til skyen (Simulert)');
+    console.log("Data som sendes til Trimble:", JSON.stringify(ksData));
+  }, 1000);
 }
 
-// Word Eksport (Enkel HTML til .doc tilnærming)
-function eksporterTilWord() {
-  const fagNavn = fagsjekkListe[$('fagFilter').value].navn;
-  const dato = new Date().toISOString().slice(0, 10);
-  
-  const content = $('reportContent').innerHTML;
-  
-  // Bygger en enkel MS Word kompatibel HTML-struktur
-  const header = `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' 
-          xmlns:w='urn:schemas-microsoft-com:office:word' 
-          xmlns='http://www.w3.org/TR/REC-html40'>
-    <head><meta charset='utf-8'><title>Eksport</title>
-    <style>
-      body { font-family: Arial, sans-serif; }
-      .sjekk-panel { border: 1px solid #ccc; margin-bottom: 15px; padding: 10px; }
-      .sjekk-header { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
-      textarea { border: none; font-family: Arial; width: 100%; }
-      img { max-width: 100%; height: auto; margin-top: 10px; }
-      button { display: none; } /* Skjuler knapper i word-dokumentet */
-    </style>
-    </head><body>
-  `;
-  const footer = "</body></html>";
-  const sourceHTML = header + content + footer;
-  
-  const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-  const lenke = document.createElement("a");
-  
-  document.body.appendChild(lenke);
-  lenke.href = source;
-  lenke.download = `Modellkontroll_${fagNavn}_${dato}.doc`;
-  lenke.click();
-  document.body.removeChild(lenke);
-  
-  setStatus('✅ Word-dokument eksportert.');
-}
-
-// Lytter for endring av fag i nedtrekksmeny
-$('fagFilter').addEventListener('change', (e) => {
-  tegnSjekkliste(e.target.value);
-});
-
-// Oppstart
-connect();
-tegnSjekkliste('veg'); // Tegner veg som standard
-
+// Start applikasjonen
+init();
 </script>
 </body>
 </html>
