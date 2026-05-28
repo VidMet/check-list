@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <meta charset="UTF-8"/>
   <title>KS-Verktøy Trimble</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -293,6 +294,25 @@ function lagreTilProsjekt() {
     setStatus('Skjema lagret til skyen (Simulert)');
     console.log("Data som sendes til Trimble:", JSON.stringify(ksData));
   }, 1000);
+}
+
+function eksporterKort() {
+  const element = $('listeInnhold');
+  const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex].text;
+  const dato = new Date().toISOString().slice(0, 10);
+  
+  const opt = {
+    margin:       10,
+    filename:     `KS_Sjekkliste_${fagNavn}_${dato}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  setStatus('⏳ Genererer PDF...');
+  html2pdf().set(opt).from(element).save().then(() => {
+    setStatus('✅ PDF eksportert til nedlastinger.');
+  });
 }
 
 // Start applikasjonen
