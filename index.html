@@ -54,9 +54,9 @@
     /* Fargekoder for status */
     .status-velger.egen-ok { background: #dcfce7; border-color: #166534; color: #166534; font-weight: 600; }
     .status-velger.egen-komm { background: #fef08a; border-color: #ca8a04; color: #854d0e; font-weight: 600; }
-    .status-velger.utb-ok { background: #e0f2fe; border-color: #0284c7; color: #0369a1; font-weight: 600; }
     .status-velger.fag-ok { background: #dbeafe; border-color: #1e3a8a; color: #1e3a8a; font-weight: 600; }
     .status-velger.fag-komm { background: #ffedd5; border-color: #c2410c; color: #9a3412; font-weight: 600; }
+    .status-velger.utb-ok { background: #e0f2fe; border-color: #0284c7; color: #0369a1; font-weight: 600; }
     .status-velger.ir { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
     
     .punkt-tekst { font-size: 12px; line-height: 1.4; padding-top: 4px; }
@@ -91,10 +91,15 @@
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
+  <span style="font-size: 11px; font-family: var(--mono); color: var(--muted);">Rev:</span>
+  <input type="number" id="versjonFelt" value="1" min="1" style="width:45px;" onchange="oppdaterEndringsstatus()">
+  
+  <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
+  
   <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px;">
   <button class="btn" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Egen</button>
-  <button class="btn" onclick="signerSkjema('utbedring')" style="background:#e0f2fe; border-color:#0284c7;">✍️ Utbedring</button>
   <button class="btn" onclick="signerSkjema('fagkontroll')" style="background:#dbeafe; border-color:#1e3a8a;">✍️ Fag</button>
+  <button class="btn" onclick="signerSkjema('utbedring')" style="background:#e0f2fe; border-color:#0284c7;">✍️ Utbedring</button>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
@@ -112,10 +117,14 @@
 let API = null;
 let strukturData = null; 
 let ksData = {};         
-let signaturData = { egenkontroll: null, utbedring: null, fagkontroll: null }; 
+let signaturData = { egenkontroll: null, fagkontroll: null, utbedring: null }; 
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
+
+function oppdaterEndringsstatus() {
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+}
 
 async function init() {
   try {
@@ -167,16 +176,15 @@ function tegnKategorier(fagNokkel) {
     body.className = 'kategori-body';
 
     kat.punkter.forEach(pkt => {
-      // Lagt til statusUtb for oppretting/utbedring
       if (!ksData[pkt.id]) {
-        ksData[pkt.id] = { statusEgen: 'Ubehandlet', statusUtb: 'Ubehandlet', statusFag: 'Ubehandlet', kommentar: '', bilde: null };
+        ksData[pkt.id] = { statusEgen: 'Ubehandlet', statusFag: 'Ubehandlet', statusUtb: 'Ubehandlet', kommentar: '', bilde: null };
       }
       const lagret = ksData[pkt.id];
 
       const pktContainer = document.createElement('div');
       pktContainer.className = 'punkt-container';
 
-      // Tre dropdown-menyer i kolonnen
+      // OPPDATERT: Fagkontroll er nå før Utbedring
       pktContainer.innerHTML = `
         <div class="punkt-rad">
           <div class="status-kolonne">
@@ -186,14 +194,14 @@ function tegnKategorier(fagNokkel) {
               <option value="Komm" ${lagret.statusEgen === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
               <option value="IR" ${lagret.statusEgen === 'IR' ? 'selected' : ''}>Ikke relevant</option>
             </select>
-            <select class="status-velger" id="utb_${pkt.id}" title="Utbedring / Oppretting">
-              <option value="Ubehandlet" ${lagret.statusUtb === 'Ubehandlet' ? 'selected' : ''}>- Utbedring -</option>
-              <option value="Utført" ${lagret.statusUtb === 'Utført' ? 'selected' : ''}>Utført / Rettet</option>
-            </select>
             <select class="status-velger" id="fag_${pkt.id}" title="Fagkontroll">
               <option value="Ubehandlet" ${lagret.statusFag === 'Ubehandlet' ? 'selected' : ''}>- Fagkontroll -</option>
               <option value="OK" ${lagret.statusFag === 'OK' ? 'selected' : ''}>OK</option>
               <option value="Komm" ${lagret.statusFag === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
+            </select>
+            <select class="status-velger" id="utb_${pkt.id}" title="Utbedring / Oppretting">
+              <option value="Ubehandlet" ${lagret.statusUtb === 'Ubehandlet' ? 'selected' : ''}>- Utbedring -</option>
+              <option value="Utført" ${lagret.statusUtb === 'Utført' ? 'selected' : ''}>Utført / Rettet</option>
             </select>
           </div>
           
@@ -223,8 +231,8 @@ function tegnKategorier(fagNokkel) {
 
     kat.punkter.forEach(pkt => {
       const selEgen = $(`egen_${pkt.id}`);
-      const selUtb = $(`utb_${pkt.id}`);
       const selFag = $(`fag_${pkt.id}`);
+      const selUtb = $(`utb_${pkt.id}`);
       const komFelt = $(`komm_${pkt.id}`);
       
       const sjekkValidering = () => {
@@ -242,30 +250,30 @@ function tegnKategorier(fagNokkel) {
         if (selEgen.value === 'Komm') selEgen.classList.add('egen-komm');
         if (selEgen.value === 'IR') selEgen.classList.add('ir');
         
-        selUtb.className = 'status-velger'; 
-        if (selUtb.value === 'Utført') selUtb.classList.add('utb-ok');
-
         selFag.className = 'status-velger'; 
         if (selFag.value === 'OK') selFag.classList.add('fag-ok');
         if (selFag.value === 'Komm') selFag.classList.add('fag-komm');
+
+        selUtb.className = 'status-velger'; 
+        if (selUtb.value === 'Utført') selUtb.classList.add('utb-ok');
         
         ksData[pkt.id].statusEgen = selEgen.value;
-        ksData[pkt.id].statusUtb = selUtb.value;
         ksData[pkt.id].statusFag = selFag.value;
+        ksData[pkt.id].statusUtb = selUtb.value;
         
         sjekkValidering();
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        oppdaterEndringsstatus();
       };
       
       selEgen.addEventListener('change', oppdaterStatus);
-      selUtb.addEventListener('change', oppdaterStatus);
       selFag.addEventListener('change', oppdaterStatus);
+      selUtb.addEventListener('change', oppdaterStatus);
       oppdaterStatus(); 
 
       komFelt.addEventListener('input', (e) => {
         ksData[pkt.id].kommentar = e.target.value;
         sjekkValidering();
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        oppdaterEndringsstatus();
       });
     });
   });
@@ -294,7 +302,7 @@ async function taBilde(punktId) {
       img.src = base64;
       ramme.style.display = 'block';
       ksData[punktId].bilde = base64;
-      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      oppdaterEndringsstatus();
       setStatus(`📷 Skjermbilde lagret for valgt punkt.`);
     } else {
       throw new Error("Mangler kontakt med Trimble API");
@@ -311,7 +319,7 @@ async function taBilde(punktId) {
     img.src = canvas.toDataURL();
     ramme.style.display = 'block';
     ksData[punktId].bilde = img.src;
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    oppdaterEndringsstatus();
     setStatus(`⚠️ Lagt inn demo-bilde.`);
   }
 }
@@ -325,16 +333,18 @@ function signerSkjema(type) {
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   signaturData[type] = { initialer: initialer, dato: dato };
   oppdaterSignaturVisning();
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  oppdaterEndringsstatus();
   setStatus(`✍️ Skjema signert for ${type}.`);
 }
 
 function oppdaterSignaturVisning() {
   const boks = $('signaturInfo');
   let tekst = [];
+  
+  // OPPDATERT: Viser signaturene i riktig kronologisk rekkefølge
   if (signaturData.egenkontroll) tekst.push(`✅ Egenkontroll: <strong>${signaturData.egenkontroll.initialer}</strong> (${signaturData.egenkontroll.dato})`);
-  if (signaturData.utbedring) tekst.push(`✅ Utbedret av: <strong>${signaturData.utbedring.initialer}</strong> (${signaturData.utbedring.dato})`);
   if (signaturData.fagkontroll) tekst.push(`✅ Fagkontroll: <strong>${signaturData.fagkontroll.initialer}</strong> (${signaturData.fagkontroll.dato})`);
+  if (signaturData.utbedring) tekst.push(`✅ Utbedret av: <strong>${signaturData.utbedring.initialer}</strong> (${signaturData.utbedring.dato})`);
   
   if (tekst.length > 0) {
     boks.innerHTML = tekst.join('&nbsp;&nbsp; | &nbsp;&nbsp;');
@@ -355,11 +365,12 @@ function eksporterKort() {
 
   const element = $('exportContainer');
   const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "Eksport";
+  const versjon = $('versjonFelt').value;
   const dato = new Date().toISOString().slice(0, 10);
   
   const opt = {
     margin:       [15, 10, 15, 10], 
-    filename:     `KS_Sjekkliste_${fagNavn}_${dato}.pdf`,
+    filename:     `KS_Sjekkliste_${fagNavn}_Rev${versjon}_${dato}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -378,9 +389,11 @@ function lagreTilProsjekt() {
   }
 
   $('syncStatus').innerText = '⏳ Synkroniserer...';
+  
   const eksportData = {
     metadata: {
       fag: $('fagFilter').value,
+      revisjon: $('versjonFelt').value,
       dato: new Date().toISOString(),
       signaturer: signaturData
     },
@@ -388,8 +401,8 @@ function lagreTilProsjekt() {
   };
   
   setTimeout(() => {
-    $('syncStatus').innerText = '🟢 Synkronisert med Trimble';
-    setStatus('Skjema lagret til prosjekthotell (Simulert)');
+    $('syncStatus').innerText = `🟢 Synkronisert med Trimble (Rev ${eksportData.metadata.revisjon})`;
+    setStatus(`Skjema lagret til prosjekthotell som Revisjon ${eksportData.metadata.revisjon} (Simulert)`);
     console.log("JSON som vil bli skrevet til Trimble:", eksportData);
   }, 1200);
 }
