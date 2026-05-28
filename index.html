@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.4</title>
+  <title>Modellkontroll v2.5</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -53,7 +53,7 @@
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    /* Rapporteringsoppsummering (Kun synlig i PDF) */
+    /* Rapporteringsoppsummering */
     #pdfSummary { display: none; margin-bottom: 24px; padding: 16px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; page-break-after: avoid; }
     #pdfSummary h2 { font-size: 18px; margin-bottom: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 4px; }
     .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
@@ -66,8 +66,12 @@
     .kategori-body { display: none; flex-direction: column; }
     
     .punkt-container { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; background: var(--surface); gap: 10px; page-break-inside: avoid; }
-    .punkt-tekst-tittel { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
     
+    /* Sletteknapp for frie punkter */
+    .punkt-tekst-tittel { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .slett-btn { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 3px 6px; font-size: 10px; font-family: var(--mono); cursor: pointer; opacity: 0.7; transition: 0.2s; }
+    .slett-btn:hover { opacity: 1; background: var(--red); color: white; }
+
     .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; margin-bottom: 4px; }
     .historikk-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; margin-bottom: 4px; color: var(--muted); }
     .historikk-status { font-weight: bold; }
@@ -97,7 +101,7 @@
     .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
     .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    .pdf-mode .kamera-btn { display: none !important; }
+    .pdf-mode .kamera-btn, .pdf-mode .slett-btn { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; }
     .pdf-mode select::-ms-expand { display: none; }
@@ -109,7 +113,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.4</span></h1>
+    <h1>Modellkontroll <span class="version">v2.5</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -236,7 +240,7 @@ async function init() {
   }
 }
 
-// Manuell scanning av modeller (filtrerer bort usynlige modeller)
+// STRENGERE MODELLSCAN
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
@@ -244,21 +248,19 @@ async function hentModeller() {
   try {
     if (API && API.viewer) {
       const models = await API.viewer.getModels();
-      // Filtrerer ut modeller som er eksplisitt skjult
+      // KUN modeller hvor visible bekreftes som TRUE blir med (ikke undefined/false)
       tilgjengeligeModeller = models
-        .filter(m => m.visible !== false)
+        .filter(m => m.visible === true)
         .map(m => ({ id: m.modelId || m.id, name: m.name }));
     } else {
-      // Fallback for lokal testing
+      // Fallback lokalt for testing
       tilgjengeligeModeller = [
         {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, 
         {id: 'm2', name: 'E6_Rekkverk.ifc'}
       ];
     }
     
-    // Auto-kryss av de funnede modellene
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
-    
     tegnModellListe();
     
     $('modelBtn').disabled = false;
@@ -390,6 +392,26 @@ function leggTilFrittPunkt() {
   }, 100);
 }
 
+// NY FUNKSJON: Slette fritt punkt
+function slettFrittPunkt(punktId) {
+  if(!confirm("Er du sikker på at du vil slette dette egendefinerte punktet?")) return;
+  
+  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
+  if(egendefKat) {
+    egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
+    
+    // Fjern hele kategorien hvis den blir tom
+    if(egendefKat.punkter.length === 0) {
+      strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte punkter");
+    }
+  }
+  
+  delete ksData[punktId];
+  
+  tegnKategorier();
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+}
+
 function getStatusFormat(kode) {
   switch(kode) {
     case 'OK': return { tekst: 'Ingen avvik, OK', css: 'ok', fargeValg: 'var(--green-dim)' };
@@ -422,7 +444,13 @@ function tegnKategorier() {
       
       const tittel = document.createElement('div');
       tittel.className = 'punkt-tekst-tittel';
-      tittel.innerText = `${index + 1}. ${pkt.tekst}`;
+      
+      // Legg til sletteknapp HVIS det er et fritt punkt
+      if (pkt.id.startsWith('fri_')) {
+        tittel.innerHTML = `<span>${index + 1}. ${pkt.tekst}</span> <button class="slett-btn" onclick="slettFrittPunkt('${pkt.id}')">🗑️ Slett</button>`;
+      } else {
+        tittel.innerText = `${index + 1}. ${pkt.tekst}`;
+      }
       pktContainer.appendChild(tittel);
 
       const faseIndex = faseRekkefolge.indexOf(aktivFase);
