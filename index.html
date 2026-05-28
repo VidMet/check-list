@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>KS-Verktøy Trimble</title>
+  <title>Modellkontroll v2.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -14,15 +14,18 @@
     :root {
       --bg: #f3f4f6; --surface: #ffffff; --surface2: #e5e7eb; --border: #d1d5db; 
       --ink: #111827; --muted: #6b7280; --blue: #1d4ed8; --blue-dim: #dbeafe;
-      --green: #166534; --red: #ef4444; --red-dim: #fef2f2;
+      --green: #166534; --green-dim: #dcfce7; --yellow: #ca8a04; --yellow-dim: #fef08a;
+      --red: #dc2626; --red-dim: #fee2e2;
       --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
+    /* Header og Toppmeny */
     header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .header-info h1 { font-size: 16px; font-weight: 700; }
+    .header-info h1 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .header-info h1 .version { font-family: var(--mono); font-size: 11px; font-weight: normal; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
     .header-info p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
     
     .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
@@ -34,76 +37,103 @@
     .btn-primary { background: var(--blue); color: white; border: none; }
     .btn-primary:hover { background: #1e40af; }
     
-    #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); }
-    #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); }
-    .cloud-sync { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--green); font-family: var(--mono); font-weight: bold; }
+    /* Modellvelger Dropdown */
+    .model-selector { position: relative; display: inline-block; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 250px; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
+    .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
+    .model-label:hover { background: var(--bg); }
+    
+    #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
+    #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; page-break-inside: avoid; }
+    /* Trekkspill og Linjer */
+    .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
     .kategori-header:hover { background: #d1d5db; }
     .kategori-body { display: none; flex-direction: column; }
     
-    .punkt-container { border-top: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; background: var(--surface); page-break-inside: avoid; }
-    .punkt-rad { display: grid; grid-template-columns: 125px 1fr 200px 32px; gap: 12px; align-items: start; }
+    .punkt-container { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; background: var(--surface); gap: 10px; page-break-inside: avoid; }
+    .punkt-tekst-tittel { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
     
-    .status-kolonne { display: flex; flex-direction: column; gap: 4px; }
-    .status-velger { font-size: 10px; font-family: var(--mono); padding: 3px 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); outline: none; }
+    /* Historikk-blokker */
+    .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; }
+    .historikk-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; margin-bottom: 4px; color: var(--muted); }
+    .historikk-status { font-weight: bold; }
+    .historikk-status.ok { color: var(--green); }
+    .historikk-status.info { color: var(--yellow); }
+    .historikk-status.avvik { color: var(--red); }
+    .historikk-kommentar { font-style: italic; margin-top: 4px; }
     
-    /* Fargekoder for status */
-    .status-velger.egen-ok { background: #dcfce7; border-color: #166534; color: #166534; font-weight: 600; }
-    .status-velger.egen-komm { background: #fef08a; border-color: #ca8a04; color: #854d0e; font-weight: 600; }
-    .status-velger.fag-ok { background: #dbeafe; border-color: #1e3a8a; color: #1e3a8a; font-weight: 600; }
-    .status-velger.fag-komm { background: #ffedd5; border-color: #c2410c; color: #9a3412; font-weight: 600; }
-    .status-velger.utb-ok { background: #e0f2fe; border-color: #0284c7; color: #0369a1; font-weight: 600; }
-    .status-velger.ir { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+    /* Aktiv Fase inntasting */
+    .aktiv-fase-boks { border: 1px solid var(--blue-dim); background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-left: 3px solid var(--blue); }
+    .fase-tittel { font-size: 11px; font-family: var(--mono); color: var(--blue); font-weight: bold; text-transform: uppercase; }
     
-    .punkt-tekst { font-size: 12px; line-height: 1.4; padding-top: 4px; }
-    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; outline: none; resize: vertical; min-height: 60px; }
-    
+    .input-rad { display: flex; gap: 10px; align-items: flex-start; }
+    .status-velger { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; outline: none; min-width: 220px; }
+    .punkt-kommentar { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; flex: 1; min-height: 30px; resize: vertical; }
     .validering-feil { border: 2px solid var(--red) !important; background-color: var(--red-dim) !important; }
     
-    .kamera-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.6; transition: opacity 0.2s; margin-top: 4px; }
-    .kamera-btn:hover { opacity: 1; }
+    .kamera-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+    .kamera-btn:hover { background: var(--surface2); }
     
-    .bilde-ramme { margin-top: 8px; display: none; border-left: 2px solid var(--blue); padding-left: 10px; }
-    .bilde-ramme img { max-height: 250px; max-width: 100%; border: 1px solid var(--border); border-radius: 4px; }
+    /* Bildegalleri */
+    .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; }
+    .bilde-galleri img:hover { opacity: 0.8; }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-info">
-    <h1>Kvalitetskontroll BIM</h1>
-    <p>Sporing av avvik og utbedring</p>
+    <h1>Modellkontroll <span class="version">v2.0</span></h1>
+    <p>Sporing av avvik og utbedring i BIM</p>
   </div>
-  <div class="cloud-sync">
-    <span id="syncStatus">🟢 Lese-modus</span>
-    <button class="btn btn-primary" onclick="lagreTilProsjekt()">☁️ Lagre til Trimble</button>
+  <div>
+    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--green); margin-right:10px;">🟢 Lese-modus</span>
+    <button class="btn btn-primary" onclick="lagreTilProsjekt()">☁️ Lagre prosjektfil</button>
   </div>
 </header>
 
 <div class="toolbar">
-  <select id="fagFilter">
+  <select id="fagFilter" onchange="byttFag(this.value)">
     <option value="">Laster fag...</option>
   </select>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <span style="font-size: 11px; font-family: var(--mono); color: var(--muted);">Rev:</span>
-  <input type="number" id="versjonFelt" value="1" min="1" style="width:45px;" onchange="oppdaterEndringsstatus()">
+  <!-- Valg av kontrollfase -->
+  <select id="faseFilter" onchange="byttFase(this.value)" style="font-weight: 600; color: var(--blue);">
+    <option value="Egenkontroll">1. Egenkontroll</option>
+    <option value="Oppretting Egen">2. Oppretting etter Egenkontroll</option>
+    <option value="Fagkontroll">3. Fagkontroll</option>
+    <option value="Oppretting Fag">4. Oppretting etter Fagkontroll</option>
+  </select>
+  
+  <!-- Valg av modeller -->
+  <div class="model-selector">
+    <button class="btn" id="modelBtn" onclick="toggleModelDropdown()">📦 Velg modeller i visning ▼</button>
+    <div id="modelDropdown" class="model-dropdown">
+      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle modeller
+      </label>
+      <div id="modelList">
+        <span style="font-size:10px; color:var(--muted);">Laster modeller fra Trimble...</span>
+      </div>
+    </div>
+  </div>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px;">
-  <button class="btn" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Egen</button>
-  <button class="btn" onclick="signerSkjema('fagkontroll')" style="background:#dbeafe; border-color:#1e3a8a;">✍️ Fag</button>
-  <button class="btn" onclick="signerSkjema('utbedring')" style="background:#e0f2fe; border-color:#0284c7;">✍️ Utbedring</button>
+  <input type="text" id="brukerInitialer" placeholder="Initialer" style="width:70px;">
+  <button class="btn" id="signerBtn" onclick="signerFase()">✍️ Signer aktiv fase</button>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <button class="btn" onclick="eksporterKort()">📄 Eksporter til PDF</button>
+  <button class="btn" onclick="eksporterPDF()">📄 Eksporter til PDF</button>
 </div>
 
 <div id="signaturInfo"></div>
@@ -116,53 +146,165 @@
 <script>
 let API = null;
 let strukturData = null; 
+let valgtFag = '';
+let aktivFase = 'Egenkontroll';
+let tilgjengeligeModeller = []; // Modeller fra API
+let valgteModeller = []; // Modeller huket av
+
+// Definerte faser for historikk-håndtering
+const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppretting Fag'];
+
+// ksData struktureres nå slik: ksData[punktId][faseNavn] = { status, kommentar, bilder: [] }
 let ksData = {};         
-let signaturData = { egenkontroll: null, fagkontroll: null, utbedring: null }; 
+let signaturData = {}; 
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
-
-function oppdaterEndringsstatus() {
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
-}
 
 async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
     setStatus('✅ Tilkoblet Trimble Connect Workspace API');
+    hentModeller();
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
+    // Mock modeller
+    tilgjengeligeModeller = [{id: 'm1', name: 'Veg_Hovedmodell.ifc'}, {id: 'm2', name: 'Rekkverk_E6.ifc'}];
+    tegnModellListe();
   }
   
   try {
     const response = await fetch('sjekklister.json');
     if (!response.ok) throw new Error("Nettverksrespons var ikke OK");
     strukturData = await response.json();
-    oppdaterFagDropdown();
+    
+    // Sett opp fag-meny
+    const select = $('fagFilter');
+    select.innerHTML = '';
+    for (const fagNokkel in strukturData) {
+      const opt = document.createElement('option');
+      opt.value = fagNokkel;
+      opt.innerText = strukturData[fagNokkel].navn;
+      select.appendChild(opt);
+    }
+    
+    if (Object.keys(strukturData).length > 0) {
+      valgtFag = Object.keys(strukturData)[0];
+      byggDataStruktur();
+      tegnKategorier();
+    }
   } catch(e) {
-    setStatus('❌ Kunne ikke laste sjekklister.json. Sjekk at den ligger i samme mappe.');
+    setStatus('❌ Kunne ikke laste sjekklister.json.');
   }
 }
 
-function oppdaterFagDropdown() {
-  const select = $('fagFilter');
-  select.innerHTML = '';
-  for (const fagNokkel in strukturData) {
-    const opt = document.createElement('option');
-    opt.value = fagNokkel;
-    opt.innerText = strukturData[fagNokkel].navn;
-    select.appendChild(opt);
-  }
-  select.addEventListener('change', (e) => tegnKategorier(e.target.value));
-  if (Object.keys(strukturData).length > 0) {
-    tegnKategorier(Object.keys(strukturData)[0]);
+async function hentModeller() {
+  try {
+    const models = await API.viewer.getModels();
+    tilgjengeligeModeller = models.map(m => ({ id: m.modelId || m.id, name: m.name }));
+    tegnModellListe();
+  } catch(e) {
+    console.error("Kunne ikke hente modeller", e);
   }
 }
 
-function tegnKategorier(fagNokkel) {
+function tegnModellListe() {
+  const container = $('modelList');
+  container.innerHTML = '';
+  
+  if(tilgjengeligeModeller.length === 0) {
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller funnet i visningen.</span>';
+    return;
+  }
+  
+  tilgjengeligeModeller.forEach(m => {
+    const isChecked = valgteModeller.includes(m.id) ? 'checked' : '';
+    const label = document.createElement('label');
+    label.className = 'model-label';
+    label.innerHTML = `<input type="checkbox" value="${m.id}" onchange="oppdaterValgteModeller()" ${isChecked}> <span title="${m.name}">${m.name}</span>`;
+    container.appendChild(label);
+  });
+}
+
+function toggleModelDropdown() {
+  $('modelDropdown').classList.toggle('show');
+}
+
+function toggleAlleModeller(masterCheckbox) {
+  const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+  oppdaterValgteModeller();
+}
+
+function oppdaterValgteModeller() {
+  const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
+  valgteModeller = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+}
+
+function lukkModelDropdown(e) {
+  if (!$('modelBtn').contains(e.target) && !$('modelDropdown').contains(e.target)) {
+    $('modelDropdown').classList.remove('show');
+  }
+}
+document.addEventListener('click', lukkModelDropdown);
+
+function byttFag(fagNokkel) {
+  valgtFag = fagNokkel;
+  byggDataStruktur();
+  tegnKategorier();
+}
+
+function byttFase(fase) {
+  aktivFase = fase;
+  
+  // Modeller låses etter Egenkontroll for å sikre konsistens
+  const modelBtn = $('modelBtn');
+  if (aktivFase !== 'Egenkontroll') {
+    modelBtn.disabled = true;
+    modelBtn.innerText = `🔒 Modeller låst (${valgteModeller.length} valgt)`;
+    modelBtn.style.opacity = '0.7';
+  } else {
+    modelBtn.disabled = false;
+    modelBtn.innerText = `📦 Velg modeller i visning ▼`;
+    modelBtn.style.opacity = '1';
+    oppdaterValgteModeller(); // Oppdaterer teksten med antall
+  }
+  
+  $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
+  tegnKategorier(); // Tegn grensesnittet på nytt med riktig fase åpen
+}
+
+// Sikrer at alle punkter eksisterer i datastrukturen for alle faser
+function byggDataStruktur() {
+  const kat = strukturData[valgtFag].kategorier;
+  kat.forEach(k => {
+    k.punkter.forEach(pkt => {
+      if (!ksData[pkt.id]) ksData[pkt.id] = {};
+      faseRekkefolge.forEach(f => {
+        if (!ksData[pkt.id][f]) {
+          ksData[pkt.id][f] = { status: '', kommentar: '', bilder: [] };
+        }
+      });
+    });
+  });
+}
+
+// Konverterer statuskode til lesbar tekst og farge
+function getStatusFormat(kode) {
+  switch(kode) {
+    case 'OK': return { tekst: 'Ingen avvik, OK', css: 'ok', fargeValg: '#dcfce7' };
+    case 'INFO': return { tekst: 'Ingen avvik, forbedringsforslag', css: 'info', fargeValg: '#fef08a' };
+    case 'AVVIK': return { tekst: 'Avvik funnet, må rettes', css: 'avvik', fargeValg: '#fee2e2' };
+    default: return { tekst: 'Ikke vurdert', css: '', fargeValg: 'var(--bg)' };
+  }
+}
+
+function tegnKategorier() {
   const main = $('listeInnhold');
   main.innerHTML = '';
-  const kategorier = strukturData[fagNokkel].kategorier;
+  const kategorier = strukturData[valgtFag].kategorier;
 
   kategorier.forEach(kat => {
     const panel = document.createElement('div');
@@ -175,48 +317,103 @@ function tegnKategorier(fagNokkel) {
     const body = document.createElement('div');
     body.className = 'kategori-body';
 
-    kat.punkter.forEach(pkt => {
-      if (!ksData[pkt.id]) {
-        ksData[pkt.id] = { statusEgen: 'Ubehandlet', statusFag: 'Ubehandlet', statusUtb: 'Ubehandlet', kommentar: '', bilde: null };
-      }
-      const lagret = ksData[pkt.id];
-
+    kat.punkter.forEach((pkt, index) => {
       const pktContainer = document.createElement('div');
       pktContainer.className = 'punkt-container';
+      
+      // Tittel for sjekkpunktet
+      const tittel = document.createElement('div');
+      tittel.className = 'punkt-tekst-tittel';
+      tittel.innerText = `${index + 1}. ${pkt.tekst}`;
+      pktContainer.appendChild(tittel);
 
-      // OPPDATERT: Fagkontroll er nå før Utbedring
-      pktContainer.innerHTML = `
-        <div class="punkt-rad">
-          <div class="status-kolonne">
-            <select class="status-velger" id="egen_${pkt.id}" title="Egenkontroll">
-              <option value="Ubehandlet" ${lagret.statusEgen === 'Ubehandlet' ? 'selected' : ''}>- Egenkontroll -</option>
-              <option value="OK" ${lagret.statusEgen === 'OK' ? 'selected' : ''}>OK</option>
-              <option value="Komm" ${lagret.statusEgen === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
-              <option value="IR" ${lagret.statusEgen === 'IR' ? 'selected' : ''}>Ikke relevant</option>
-            </select>
-            <select class="status-velger" id="fag_${pkt.id}" title="Fagkontroll">
-              <option value="Ubehandlet" ${lagret.statusFag === 'Ubehandlet' ? 'selected' : ''}>- Fagkontroll -</option>
-              <option value="OK" ${lagret.statusFag === 'OK' ? 'selected' : ''}>OK</option>
-              <option value="Komm" ${lagret.statusFag === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
-            </select>
-            <select class="status-velger" id="utb_${pkt.id}" title="Utbedring / Oppretting">
-              <option value="Ubehandlet" ${lagret.statusUtb === 'Ubehandlet' ? 'selected' : ''}>- Utbedring -</option>
-              <option value="Utført" ${lagret.statusUtb === 'Utført' ? 'selected' : ''}>Utført / Rettet</option>
-            </select>
-          </div>
+      const faseIndex = faseRekkefolge.indexOf(aktivFase);
+      
+      // 1. TEGN HISTORIKK FOR TIDLIGERE FASER
+      faseRekkefolge.forEach((faseNavn, i) => {
+        if (i < faseIndex) {
+          const historikkData = ksData[pkt.id][faseNavn];
+          if (historikkData && historikkData.status !== '') {
+            const histBlokk = document.createElement('div');
+            histBlokk.className = 'historikk-blokk';
+            
+            const format = getStatusFormat(historikkData.status);
+            
+            let html = `
+              <div class="historikk-header">
+                <span>Fase: ${faseNavn}</span>
+                <span class="historikk-status ${format.css}">${format.tekst}</span>
+              </div>
+            `;
+            if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
+            
+            if (historikkData.bilder && historikkData.bilder.length > 0) {
+              html += `<div class="bilde-galleri" style="margin-top:8px;">`;
+              historikkData.bilder.forEach(b64 => {
+                html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`;
+              });
+              html += `</div>`;
+            }
+            histBlokk.innerHTML = html;
+            pktContainer.appendChild(histBlokk);
+          }
+        }
+      });
+
+      // 2. TEGN INPUT FOR AKTIV FASE
+      const aktivData = ksData[pkt.id][aktivFase];
+      const aktivBlokk = document.createElement('div');
+      aktivBlokk.className = 'aktiv-fase-boks';
+      
+      aktivBlokk.innerHTML = `
+        <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
+        <div class="input-rad">
+          <select class="status-velger" id="status_${pkt.id}">
+            <option value="">- Velg status for funn -</option>
+            <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
+            <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
+            <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
+          </select>
           
-          <div class="punkt-tekst">${pkt.tekst}</div>
+          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv din kommentar her...">${aktivData.kommentar}</textarea>
           
-          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Beskriv avvik og utbedring...">${lagret.kommentar}</textarea>
-          
-          <button class="kamera-btn" onclick="taBilde('${pkt.id}')" title="Ta skjermbilde fra 3D">📷</button>
+          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Legg til bilde</button>
         </div>
-        
-        <div class="bilde-ramme" id="ramme_${pkt.id}" style="display: ${lagret.bilde ? 'block' : 'none'};">
-          <img id="bilde_${pkt.id}" src="${lagret.bilde || ''}">
-        </div>
+        <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
       `;
+      pktContainer.appendChild(aktivBlokk);
       body.appendChild(pktContainer);
+
+      // DOM-håndtering etter innsetting
+      setTimeout(() => {
+        oppdaterGalleriUI(pkt.id); // Viser allerede lagrede bilder
+        
+        const sel = $(`status_${pkt.id}`);
+        const kom = $(`komm_${pkt.id}`);
+        
+        const sjekkValidering = () => {
+          if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
+            kom.classList.add('validering-feil');
+          } else {
+            kom.classList.remove('validering-feil');
+          }
+          sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
+        };
+        
+        sel.addEventListener('change', (e) => {
+          ksData[pkt.id][aktivFase].status = e.target.value;
+          sjekkValidering();
+          $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        });
+        
+        kom.addEventListener('input', (e) => {
+          ksData[pkt.id][aktivFase].kommentar = e.target.value;
+          sjekkValidering();
+          $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        });
+        
+        sjekkValidering();
+      }, 0);
     });
 
     panel.appendChild(header);
@@ -228,62 +425,14 @@ function tegnKategorier(fagNokkel) {
       body.style.display = isOpen ? 'none' : 'flex';
       header.querySelector('span').innerText = `${isOpen ? '▶' : '▼'} ${kat.navn}`;
     });
-
-    kat.punkter.forEach(pkt => {
-      const selEgen = $(`egen_${pkt.id}`);
-      const selFag = $(`fag_${pkt.id}`);
-      const selUtb = $(`utb_${pkt.id}`);
-      const komFelt = $(`komm_${pkt.id}`);
-      
-      const sjekkValidering = () => {
-        const kreverKomm = (selEgen.value === 'Komm' || selFag.value === 'Komm');
-        if (kreverKomm && komFelt.value.trim() === '') {
-          komFelt.classList.add('validering-feil');
-        } else {
-          komFelt.classList.remove('validering-feil');
-        }
-      };
-
-      const oppdaterStatus = () => {
-        selEgen.className = 'status-velger'; 
-        if (selEgen.value === 'OK') selEgen.classList.add('egen-ok');
-        if (selEgen.value === 'Komm') selEgen.classList.add('egen-komm');
-        if (selEgen.value === 'IR') selEgen.classList.add('ir');
-        
-        selFag.className = 'status-velger'; 
-        if (selFag.value === 'OK') selFag.classList.add('fag-ok');
-        if (selFag.value === 'Komm') selFag.classList.add('fag-komm');
-
-        selUtb.className = 'status-velger'; 
-        if (selUtb.value === 'Utført') selUtb.classList.add('utb-ok');
-        
-        ksData[pkt.id].statusEgen = selEgen.value;
-        ksData[pkt.id].statusFag = selFag.value;
-        ksData[pkt.id].statusUtb = selUtb.value;
-        
-        sjekkValidering();
-        oppdaterEndringsstatus();
-      };
-      
-      selEgen.addEventListener('change', oppdaterStatus);
-      selFag.addEventListener('change', oppdaterStatus);
-      selUtb.addEventListener('change', oppdaterStatus);
-      oppdaterStatus(); 
-
-      komFelt.addEventListener('input', (e) => {
-        ksData[pkt.id].kommentar = e.target.value;
-        sjekkValidering();
-        oppdaterEndringsstatus();
-      });
-    });
   });
 }
 
-function validerAllePunkter() {
+function validerAktivFase() {
   let harFeil = false;
   for (const id in ksData) {
-    const data = ksData[id];
-    if ((data.statusEgen === 'Komm' || data.statusFag === 'Komm') && data.kommentar.trim() === '') {
+    const data = ksData[id][aktivFase];
+    if (data && (data.status === 'AVVIK' || data.status === 'INFO') && data.kommentar.trim() === '') {
       const felt = $(`komm_${id}`);
       if (felt) felt.classList.add('validering-feil');
       harFeil = true;
@@ -292,72 +441,94 @@ function validerAllePunkter() {
   return !harFeil;
 }
 
+// Bildehåndtering med støtte for array
 async function taBilde(punktId) {
-  const ramme = $(`ramme_${punktId}`);
-  const img = $(`bilde_${punktId}`);
-  
   try {
+    let base64;
     if (API && API.viewer && typeof API.viewer.getSnapshot === 'function') {
-      const base64 = await API.viewer.getSnapshot();
-      img.src = base64;
-      ramme.style.display = 'block';
-      ksData[punktId].bilde = base64;
-      oppdaterEndringsstatus();
-      setStatus(`📷 Skjermbilde lagret for valgt punkt.`);
+      base64 = await API.viewer.getSnapshot();
     } else {
-      throw new Error("Mangler kontakt med Trimble API");
+      // Fallback
+      const canvas = document.createElement('canvas');
+      canvas.width = 300; canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,300,150);
+      ctx.fillStyle = '#0f172a'; ctx.font = '12px sans-serif'; 
+      ctx.fillText(`Snap: ${new Date().toLocaleTimeString()}`, 90, 80);
+      base64 = canvas.toDataURL();
     }
-  } catch (e) {
-    console.error("Feil ved skjermbilde:", e);
-    const canvas = document.createElement('canvas');
-    canvas.width = 400; canvas.height = 200;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,400,200);
-    ctx.fillStyle = '#0f172a'; ctx.font = '14px sans-serif'; 
-    ctx.fillText('Demo: Bilde fra 3D', 130, 105);
     
-    img.src = canvas.toDataURL();
-    ramme.style.display = 'block';
-    ksData[punktId].bilde = img.src;
-    oppdaterEndringsstatus();
-    setStatus(`⚠️ Lagt inn demo-bilde.`);
+    // Legg bildet til i arrayen for aktiv fase
+    ksData[punktId][aktivFase].bilder.push(base64);
+    oppdaterGalleriUI(punktId);
+    
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
+  } catch (e) {
+    console.error("Feil ved bilde", e);
+    alert("Kunne ikke ta bilde: " + e.message);
   }
 }
 
-function signerSkjema(type) {
+function oppdaterGalleriUI(punktId) {
+  const galleri = $(`galleri_${punktId}`);
+  if(!galleri) return;
+  galleri.innerHTML = '';
+  const bilder = ksData[punktId][aktivFase].bilder || [];
+  
+  bilder.forEach((b64, imgIndex) => {
+    const img = document.createElement('img');
+    img.src = b64;
+    img.title = "Klikk for å fjerne bilde";
+    img.onclick = () => {
+      if(confirm("Slette dette bildet?")) {
+        ksData[punktId][aktivFase].bilder.splice(imgIndex, 1);
+        oppdaterGalleriUI(punktId);
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      }
+    };
+    galleri.appendChild(img);
+  });
+}
+
+function signerFase() {
   const initialer = $('brukerInitialer').value.trim();
   if (!initialer) {
     alert("Vennligst skriv inn initialene dine i tekstfeltet før du signerer.");
     return;
   }
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-  signaturData[type] = { initialer: initialer, dato: dato };
+  
+  signaturData[aktivFase] = { initialer: initialer, dato: dato };
   oppdaterSignaturVisning();
-  oppdaterEndringsstatus();
-  setStatus(`✍️ Skjema signert for ${type}.`);
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus(`✍️ Signert for fasen: ${aktivFase}.`);
 }
 
 function oppdaterSignaturVisning() {
   const boks = $('signaturInfo');
-  let tekst = [];
+  boks.innerHTML = '';
   
-  // OPPDATERT: Viser signaturene i riktig kronologisk rekkefølge
-  if (signaturData.egenkontroll) tekst.push(`✅ Egenkontroll: <strong>${signaturData.egenkontroll.initialer}</strong> (${signaturData.egenkontroll.dato})`);
-  if (signaturData.fagkontroll) tekst.push(`✅ Fagkontroll: <strong>${signaturData.fagkontroll.initialer}</strong> (${signaturData.fagkontroll.dato})`);
-  if (signaturData.utbedring) tekst.push(`✅ Utbedret av: <strong>${signaturData.utbedring.initialer}</strong> (${signaturData.utbedring.dato})`);
+  let harSignaturer = false;
+  faseRekkefolge.forEach(fase => {
+    if (signaturData[fase]) {
+      const sp = document.createElement('span');
+      sp.innerHTML = `✅ <strong>${fase}:</strong> ${signaturData[fase].initialer} (${signaturData[fase].dato})`;
+      boks.appendChild(sp);
+      harSignaturer = true;
+    }
+  });
   
-  if (tekst.length > 0) {
-    boks.innerHTML = tekst.join('&nbsp;&nbsp; | &nbsp;&nbsp;');
-    boks.style.display = 'block';
-  }
+  boks.style.display = harSignaturer ? 'flex' : 'none';
 }
 
-function eksporterKort() {
-  if (!validerAllePunkter()) {
-    alert("Feil: Du har markert 'Avvik funnet' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
+function eksporterPDF() {
+  if (!validerAktivFase()) {
+    alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før eksport.");
     return;
   }
 
+  // Åpne alle faner for print
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
   document.querySelectorAll('.kategori-header span:first-child').forEach(el => {
     el.innerText = el.innerText.replace('▶', '▼');
@@ -365,27 +536,30 @@ function eksporterKort() {
 
   const element = $('exportContainer');
   const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "Eksport";
-  const versjon = $('versjonFelt').value;
   const dato = new Date().toISOString().slice(0, 10);
+  const rensFaseNavn = aktivFase.replace(/\s+/g, '');
   
   const opt = {
     margin:       [15, 10, 15, 10], 
-    filename:     `KS_Sjekkliste_${fagNavn}_Rev${versjon}_${dato}.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
+    filename:     `Modellkontroll_${fagNavn}_${rensFaseNavn}_${dato}.pdf`,
+    image:        { type: 'jpeg', quality: 0.95 },
     html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  setStatus('⏳ Genererer PDF... Vennligst vent.');
+  setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.');
   html2pdf().set(opt).from(element).save().then(() => {
     setStatus('✅ PDF generert og lagt i nedlastinger.');
   });
 }
 
 function lagreTilProsjekt() {
-  if (!validerAllePunkter()) {
-    alert("Feil: Du har markert 'Avvik funnet' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
+  if (!validerAktivFase()) {
+    alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før lagring.");
     return;
+  }
+  if (aktivFase === 'Egenkontroll' && valgteModeller.length === 0) {
+    if(!confirm("Du har ikke valgt noen modeller. Vil du lagre likevel?")) return;
   }
 
   $('syncStatus').innerText = '⏳ Synkroniserer...';
@@ -393,16 +567,17 @@ function lagreTilProsjekt() {
   const eksportData = {
     metadata: {
       fag: $('fagFilter').value,
-      revisjon: $('versjonFelt').value,
+      sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
+      modeller: valgteModeller,
       signaturer: signaturData
     },
     kontrollData: ksData
   };
   
   setTimeout(() => {
-    $('syncStatus').innerText = `🟢 Synkronisert med Trimble (Rev ${eksportData.metadata.revisjon})`;
-    setStatus(`Skjema lagret til prosjekthotell som Revisjon ${eksportData.metadata.revisjon} (Simulert)`);
+    $('syncStatus').innerText = `🟢 Synkronisert (Sist lagret: ${aktivFase})`;
+    setStatus(`Prosjektfil er klargjort for Trimble lagring.`);
     console.log("JSON som vil bli skrevet til Trimble:", eksportData);
   }, 1200);
 }
