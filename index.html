@@ -218,27 +218,28 @@ async function taBilde(punktId) {
   
   try {
     if (API && API.viewer) {
-      const base64 = await API.viewer.getScreenshot();
+      let base64;
+      
+      // Sjekker hvilken metode som faktisk er tilgjengelig i API-et
+      if (typeof API.viewer.getScreenshot === 'function') {
+        base64 = await API.viewer.getScreenshot();
+      } else if (typeof API.viewer.captureScreenshot === 'function') {
+        base64 = await API.viewer.captureScreenshot();
+      } else {
+        throw new Error("Fant ingen støttet skjermbilde-metode i API.viewer");
+      }
+
       img.src = base64;
       ramme.style.display = 'block';
       ksData[punktId].bilde = base64;
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      setStatus(`📷 Bilde lagret for punkt.`);
+      
     } else {
-      throw new Error("Mangler Trimble API");
+      throw new Error("Mangler kontakt med Trimble API");
     }
   } catch (e) {
-    // Fallback for lokal testing
-    const canvas = document.createElement('canvas');
-    canvas.width = 400; canvas.height = 200;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,400,200);
-    ctx.fillStyle = '#0f172a'; ctx.font = '14px sans-serif'; ctx.fillText('Demo: Bilde fra 3D-visning', 110, 105);
-    
-    img.src = canvas.toDataURL();
-    ramme.style.display = 'block';
-    ksData[punktId].bilde = img.src;
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    console.error("Feil ved skjermbilde:", e);
+    alert("Kunne ikke ta bilde fra 3D-modellen. Sjekk konsollen (F12) for detaljer.\nFeilmelding: " + e.message);
   }
 }
 
