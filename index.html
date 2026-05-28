@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.3</title>
+  <title>Modellkontroll v2.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -32,9 +32,12 @@
     .toolbar input { cursor: text; }
     
     .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; }
-    .btn:hover { background: var(--border); }
+    .btn:hover:not(:disabled) { background: var(--border); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--blue); color: white; border: none; }
-    .btn-primary:hover { background: #1e40af; }
+    .btn-primary:hover:not(:disabled) { background: #1e40af; }
+    .btn-outline { background: transparent; border: 1px solid var(--blue); color: var(--blue); }
+    .btn-outline:hover:not(:disabled) { background: var(--blue-dim); }
     
     .signatur-boks { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); }
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
@@ -94,7 +97,6 @@
     .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
     .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    /* PDF Eksport styling (Har fjernet overstyringen av farger på aktiv-fase-boks for å beholde fargene i PDF) */
     .pdf-mode .kamera-btn { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; }
@@ -107,7 +109,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.3</span></h1>
+    <h1>Modellkontroll <span class="version">v2.4</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -130,14 +132,17 @@
     <option value="Oppretting Fag">4. Oppretting etter Fagkontroll</option>
   </select>
   
+  <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
+
+  <button class="btn btn-outline" id="scanBtn" onclick="hentModeller()">🔍 Skann 3D-visning</button>
   <div class="model-selector">
-    <button class="btn" id="modelBtn" onclick="toggleModelDropdown()">📦 Velg modeller i visningen ▼</button>
+    <button class="btn" id="modelBtn" onclick="toggleModelDropdown()" disabled>📦 Skann modeller først ▼</button>
     <div id="modelDropdown" class="model-dropdown">
       <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
-        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visning
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visningen
       </label>
       <div id="modelList">
-        <span style="font-size:10px; color:var(--muted);">Laster modeller fra Trimble...</span>
+        <span style="font-size:10px; color:var(--muted);">Trykk "Skann 3D-visning" for å finne modeller.</span>
       </div>
     </div>
   </div>
@@ -203,11 +208,8 @@ async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
     setStatus('✅ Tilkoblet Trimble Connect Workspace API');
-    hentModeller();
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
-    tilgjengeligeModeller = [{id: 'm1', name: 'Veg_Hovedmodell.ifc'}, {id: 'm2', name: 'Rekkverk_E6.ifc'}];
-    tegnModellListe();
   }
   
   try {
@@ -234,17 +236,41 @@ async function init() {
   }
 }
 
-// Henter KUN modeller som er synlige/lastet i vieweren
+// Manuell scanning av modeller (filtrerer bort usynlige modeller)
 async function hentModeller() {
+  const scanBtn = $('scanBtn');
+  scanBtn.innerText = '⏳ Skanner...';
+  
   try {
-    const models = await API.viewer.getModels();
-    // Forsøker å filtrere ut modeller som kanskje er skjult (hvis API-et støtter visible-flagget)
-    tilgjengeligeModeller = models
-      .filter(m => m.visible !== false)
-      .map(m => ({ id: m.modelId || m.id, name: m.name }));
+    if (API && API.viewer) {
+      const models = await API.viewer.getModels();
+      // Filtrerer ut modeller som er eksplisitt skjult
+      tilgjengeligeModeller = models
+        .filter(m => m.visible !== false)
+        .map(m => ({ id: m.modelId || m.id, name: m.name }));
+    } else {
+      // Fallback for lokal testing
+      tilgjengeligeModeller = [
+        {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, 
+        {id: 'm2', name: 'E6_Rekkverk.ifc'}
+      ];
+    }
+    
+    // Auto-kryss av de funnede modellene
+    valgteModeller = tilgjengeligeModeller.map(m => m.name);
+    
     tegnModellListe();
+    
+    $('modelBtn').disabled = false;
+    $('checkAllModels').checked = true;
+    oppdaterValgteModeller();
+    
+    scanBtn.innerText = `✅ Fant ${tilgjengeligeModeller.length} modeller`;
+    setTimeout(() => { scanBtn.innerText = '🔍 Skann 3D-visning på nytt'; }, 3000);
+    
   } catch(e) {
     console.error("Kunne ikke hente modeller", e);
+    scanBtn.innerText = '❌ Feil ved skann';
   }
 }
 
@@ -253,7 +279,7 @@ function tegnModellListe() {
   container.innerHTML = '';
   
   if(tilgjengeligeModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen.</span>';
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen akkurat nå.</span>';
     return;
   }
   
@@ -298,15 +324,27 @@ function byttFase(fase) {
   aktivFase = fase;
   
   const modelBtn = $('modelBtn');
+  const scanBtn = $('scanBtn');
+  
   if (aktivFase !== 'Egenkontroll') {
     modelBtn.disabled = true;
+    scanBtn.disabled = true;
+    scanBtn.style.opacity = '0.5';
     modelBtn.innerText = `🔒 Modeller låst (${valgteModeller.length} valgt)`;
     modelBtn.style.opacity = '0.7';
   } else {
-    modelBtn.disabled = false;
-    modelBtn.innerText = `📦 Velg modeller i visningen ▼`;
-    modelBtn.style.opacity = '1';
-    oppdaterValgteModeller(); 
+    scanBtn.disabled = false;
+    scanBtn.style.opacity = '1';
+    
+    if (tilgjengeligeModeller.length > 0) {
+      modelBtn.disabled = false;
+      modelBtn.innerText = `📦 Velg modeller i visningen ▼`;
+      modelBtn.style.opacity = '1';
+      oppdaterValgteModeller(); 
+    } else {
+      modelBtn.disabled = true;
+      modelBtn.innerText = `📦 Skann modeller først ▼`;
+    }
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
@@ -590,7 +628,6 @@ function oppdaterSignaturVisning() {
 function byggPDFSummary() {
   $('sumFag').innerText = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "";
   
-  // Bygger opp en punktliste for modellene i oppsummeringen
   if (valgteModeller.length > 0) {
     $('sumModeller').innerHTML = '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' + valgteModeller.map(m => `<li>${m}</li>`).join('') + '</ul>';
   } else {
