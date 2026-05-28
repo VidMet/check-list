@@ -21,7 +21,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* Header og Toppmeny */
     header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .header-info h1 { font-size: 16px; font-weight: 700; }
     .header-info p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
@@ -35,22 +34,19 @@
     .btn-primary { background: var(--blue); color: white; border: none; }
     .btn-primary:hover { background: #1e40af; }
     
-    /* Signatur- og statusfelt */
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); }
     .cloud-sync { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--green); font-family: var(--mono); font-weight: bold; }
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    /* Trekkspill-kategorier */
     .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
     .kategori-header:hover { background: #d1d5db; }
     .kategori-body { display: none; flex-direction: column; }
     
-    /* Enkeltlinje-designet med to kontrollkolonner */
     .punkt-container { border-top: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; background: var(--surface); page-break-inside: avoid; }
-    .punkt-rad { display: grid; grid-template-columns: 120px 1fr 200px 32px; gap: 12px; align-items: start; }
+    .punkt-rad { display: grid; grid-template-columns: 125px 1fr 200px 32px; gap: 12px; align-items: start; }
     
     .status-kolonne { display: flex; flex-direction: column; gap: 4px; }
     .status-velger { font-size: 10px; font-family: var(--mono); padding: 3px 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); outline: none; }
@@ -58,14 +54,14 @@
     /* Fargekoder for status */
     .status-velger.egen-ok { background: #dcfce7; border-color: #166534; color: #166534; font-weight: 600; }
     .status-velger.egen-komm { background: #fef08a; border-color: #ca8a04; color: #854d0e; font-weight: 600; }
+    .status-velger.utb-ok { background: #e0f2fe; border-color: #0284c7; color: #0369a1; font-weight: 600; }
     .status-velger.fag-ok { background: #dbeafe; border-color: #1e3a8a; color: #1e3a8a; font-weight: 600; }
     .status-velger.fag-komm { background: #ffedd5; border-color: #c2410c; color: #9a3412; font-weight: 600; }
     .status-velger.ir { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
     
     .punkt-tekst { font-size: 12px; line-height: 1.4; padding-top: 4px; }
-    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; outline: none; resize: vertical; min-height: 48px; }
+    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; outline: none; resize: vertical; min-height: 60px; }
     
-    /* CSS for når en obligatorisk kommentar mangler */
     .validering-feil { border: 2px solid var(--red) !important; background-color: var(--red-dim) !important; }
     
     .kamera-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.6; transition: opacity 0.2s; margin-top: 4px; }
@@ -80,7 +76,7 @@
 <header>
   <div class="header-info">
     <h1>Kvalitetskontroll BIM</h1>
-    <p>Prosjektoppsett og fagkontroll</p>
+    <p>Sporing av avvik og utbedring</p>
   </div>
   <div class="cloud-sync">
     <span id="syncStatus">🟢 Lese-modus</span>
@@ -96,8 +92,9 @@
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
   <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px;">
-  <button class="btn" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Signer Egen</button>
-  <button class="btn" onclick="signerSkjema('fagkontroll')" style="background:#dbeafe; border-color:#1e3a8a;">✍️ Signer Fag</button>
+  <button class="btn" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Egen</button>
+  <button class="btn" onclick="signerSkjema('utbedring')" style="background:#e0f2fe; border-color:#0284c7;">✍️ Utbedring</button>
+  <button class="btn" onclick="signerSkjema('fagkontroll')" style="background:#dbeafe; border-color:#1e3a8a;">✍️ Fag</button>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
@@ -108,15 +105,14 @@
 <div id="statusBar">Venter på tilkobling...</div>
 
 <main id="exportContainer">
-  <div id="listeInnhold">
-    </div>
+  <div id="listeInnhold"></div>
 </main>
 
 <script>
 let API = null;
 let strukturData = null; 
 let ksData = {};         
-let signaturData = { egenkontroll: null, fagkontroll: null }; 
+let signaturData = { egenkontroll: null, utbedring: null, fagkontroll: null }; 
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
@@ -171,35 +167,39 @@ function tegnKategorier(fagNokkel) {
     body.className = 'kategori-body';
 
     kat.punkter.forEach(pkt => {
-      // OPPDATERT: Deler nå dataene i to separate statuser
+      // Lagt til statusUtb for oppretting/utbedring
       if (!ksData[pkt.id]) {
-        ksData[pkt.id] = { statusEgen: 'Ubehandlet', statusFag: 'Ubehandlet', kommentar: '', bilde: null };
+        ksData[pkt.id] = { statusEgen: 'Ubehandlet', statusUtb: 'Ubehandlet', statusFag: 'Ubehandlet', kommentar: '', bilde: null };
       }
       const lagret = ksData[pkt.id];
 
       const pktContainer = document.createElement('div');
       pktContainer.className = 'punkt-container';
 
-      // OPPDATERT: Setter inn to dropdown-menyer per punkt
+      // Tre dropdown-menyer i kolonnen
       pktContainer.innerHTML = `
         <div class="punkt-rad">
           <div class="status-kolonne">
             <select class="status-velger" id="egen_${pkt.id}" title="Egenkontroll">
               <option value="Ubehandlet" ${lagret.statusEgen === 'Ubehandlet' ? 'selected' : ''}>- Egenkontroll -</option>
               <option value="OK" ${lagret.statusEgen === 'OK' ? 'selected' : ''}>OK</option>
-              <option value="Komm" ${lagret.statusEgen === 'Komm' ? 'selected' : ''}>Avvik / Komm.</option>
+              <option value="Komm" ${lagret.statusEgen === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
               <option value="IR" ${lagret.statusEgen === 'IR' ? 'selected' : ''}>Ikke relevant</option>
+            </select>
+            <select class="status-velger" id="utb_${pkt.id}" title="Utbedring / Oppretting">
+              <option value="Ubehandlet" ${lagret.statusUtb === 'Ubehandlet' ? 'selected' : ''}>- Utbedring -</option>
+              <option value="Utført" ${lagret.statusUtb === 'Utført' ? 'selected' : ''}>Utført / Rettet</option>
             </select>
             <select class="status-velger" id="fag_${pkt.id}" title="Fagkontroll">
               <option value="Ubehandlet" ${lagret.statusFag === 'Ubehandlet' ? 'selected' : ''}>- Fagkontroll -</option>
               <option value="OK" ${lagret.statusFag === 'OK' ? 'selected' : ''}>OK</option>
-              <option value="Komm" ${lagret.statusFag === 'Komm' ? 'selected' : ''}>Avvik / Komm.</option>
+              <option value="Komm" ${lagret.statusFag === 'Komm' ? 'selected' : ''}>Avvik funnet</option>
             </select>
           </div>
           
           <div class="punkt-tekst">${pkt.tekst}</div>
           
-          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar / avvik...">${lagret.kommentar}</textarea>
+          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Beskriv avvik og utbedring...">${lagret.kommentar}</textarea>
           
           <button class="kamera-btn" onclick="taBilde('${pkt.id}')" title="Ta skjermbilde fra 3D">📷</button>
         </div>
@@ -221,9 +221,9 @@ function tegnKategorier(fagNokkel) {
       header.querySelector('span').innerText = `${isOpen ? '▶' : '▼'} ${kat.navn}`;
     });
 
-    // Lyttere for begge menyene og kommentar-validering
     kat.punkter.forEach(pkt => {
       const selEgen = $(`egen_${pkt.id}`);
+      const selUtb = $(`utb_${pkt.id}`);
       const selFag = $(`fag_${pkt.id}`);
       const komFelt = $(`komm_${pkt.id}`);
       
@@ -237,19 +237,20 @@ function tegnKategorier(fagNokkel) {
       };
 
       const oppdaterStatus = () => {
-        // Fargesetting Egenkontroll
         selEgen.className = 'status-velger'; 
         if (selEgen.value === 'OK') selEgen.classList.add('egen-ok');
         if (selEgen.value === 'Komm') selEgen.classList.add('egen-komm');
         if (selEgen.value === 'IR') selEgen.classList.add('ir');
         
-        // Fargesetting Fagkontroll
+        selUtb.className = 'status-velger'; 
+        if (selUtb.value === 'Utført') selUtb.classList.add('utb-ok');
+
         selFag.className = 'status-velger'; 
         if (selFag.value === 'OK') selFag.classList.add('fag-ok');
         if (selFag.value === 'Komm') selFag.classList.add('fag-komm');
         
-        // Lagring
         ksData[pkt.id].statusEgen = selEgen.value;
+        ksData[pkt.id].statusUtb = selUtb.value;
         ksData[pkt.id].statusFag = selFag.value;
         
         sjekkValidering();
@@ -257,6 +258,7 @@ function tegnKategorier(fagNokkel) {
       };
       
       selEgen.addEventListener('change', oppdaterStatus);
+      selUtb.addEventListener('change', oppdaterStatus);
       selFag.addEventListener('change', oppdaterStatus);
       oppdaterStatus(); 
 
@@ -269,7 +271,6 @@ function tegnKategorier(fagNokkel) {
   });
 }
 
-// Funksjon som stopper lagring/eksport hvis kommentarer mangler
 function validerAllePunkter() {
   let harFeil = false;
   for (const id in ksData) {
@@ -305,7 +306,7 @@ async function taBilde(punktId) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,400,200);
     ctx.fillStyle = '#0f172a'; ctx.font = '14px sans-serif'; 
-    ctx.fillText('Demo: Bilde fra 3D (Kjører lokalt)', 90, 105);
+    ctx.fillText('Demo: Bilde fra 3D', 130, 105);
     
     img.src = canvas.toDataURL();
     ramme.style.display = 'block';
@@ -331,8 +332,9 @@ function signerSkjema(type) {
 function oppdaterSignaturVisning() {
   const boks = $('signaturInfo');
   let tekst = [];
-  if (signaturData.egenkontroll) tekst.push(`✅ Egenkontroll utført av: <strong>${signaturData.egenkontroll.initialer}</strong> (${signaturData.egenkontroll.dato})`);
-  if (signaturData.fagkontroll) tekst.push(`✅ Fagkontroll godkjent av: <strong>${signaturData.fagkontroll.initialer}</strong> (${signaturData.fagkontroll.dato})`);
+  if (signaturData.egenkontroll) tekst.push(`✅ Egenkontroll: <strong>${signaturData.egenkontroll.initialer}</strong> (${signaturData.egenkontroll.dato})`);
+  if (signaturData.utbedring) tekst.push(`✅ Utbedret av: <strong>${signaturData.utbedring.initialer}</strong> (${signaturData.utbedring.dato})`);
+  if (signaturData.fagkontroll) tekst.push(`✅ Fagkontroll: <strong>${signaturData.fagkontroll.initialer}</strong> (${signaturData.fagkontroll.dato})`);
   
   if (tekst.length > 0) {
     boks.innerHTML = tekst.join('&nbsp;&nbsp; | &nbsp;&nbsp;');
@@ -342,7 +344,7 @@ function oppdaterSignaturVisning() {
 
 function eksporterKort() {
   if (!validerAllePunkter()) {
-    alert("Feil: Du har markert 'Avvik / Komm.' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
+    alert("Feil: Du har markert 'Avvik funnet' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
     return;
   }
 
@@ -371,7 +373,7 @@ function eksporterKort() {
 
 function lagreTilProsjekt() {
   if (!validerAllePunkter()) {
-    alert("Feil: Du har markert 'Avvik / Komm.' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
+    alert("Feil: Du har markert 'Avvik funnet' på ett eller flere punkter uten å skrive kommentar. Fyll ut de rødmarkerte feltene for å fortsette.");
     return;
   }
 
