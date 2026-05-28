@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.0</title>
+  <title>Modellkontroll v2.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -22,7 +22,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* Header og Toppmeny */
     header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .header-info h1 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
     .header-info h1 .version { font-family: var(--mono); font-size: 11px; font-weight: normal; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
@@ -37,7 +36,10 @@
     .btn-primary { background: var(--blue); color: white; border: none; }
     .btn-primary:hover { background: #1e40af; }
     
-    /* Modellvelger Dropdown */
+    /* Signatur-boks for økt synlighet */
+    .signatur-boks { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); }
+    .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
+    
     .model-selector { position: relative; display: inline-block; }
     .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 250px; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
@@ -49,7 +51,6 @@
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    /* Trekkspill og Linjer */
     .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
     .kategori-header:hover { background: #d1d5db; }
@@ -65,31 +66,38 @@
     .historikk-status.ok { color: var(--green); }
     .historikk-status.info { color: var(--yellow); }
     .historikk-status.avvik { color: var(--red); }
+    .historikk-status.ir { color: var(--muted); text-decoration: line-through; }
     .historikk-kommentar { font-style: italic; margin-top: 4px; }
     
-    /* Aktiv Fase inntasting */
-    .aktiv-fase-boks { border: 1px solid var(--blue-dim); background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-left: 3px solid var(--blue); }
+    /* Aktiv Fase inntasting - Dynamiske farger */
+    .aktiv-fase-boks { background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-left-width: 4px; transition: all 0.3s ease; }
+    
+    .border-default { border-left-color: var(--blue); }
+    .border-ok { border-left-color: var(--green); background: #f4fdf8; }
+    .border-info { border-left-color: var(--yellow); background: #fffdf4; }
+    .border-avvik { border-left-color: var(--red); background: #fef4f4; }
+    .border-ir { border-left-color: var(--muted); opacity: 0.55; filter: grayscale(50%); }
+    
     .fase-tittel { font-size: 11px; font-family: var(--mono); color: var(--blue); font-weight: bold; text-transform: uppercase; }
     
     .input-rad { display: flex; gap: 10px; align-items: flex-start; }
-    .status-velger { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; outline: none; min-width: 220px; }
+    .status-velger { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; outline: none; min-width: 240px; }
     .punkt-kommentar { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; flex: 1; min-height: 30px; resize: vertical; }
     .validering-feil { border: 2px solid var(--red) !important; background-color: var(--red-dim) !important; }
     
     .kamera-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: 0.2s; flex-shrink: 0; }
     .kamera-btn:hover { background: var(--surface2); }
     
-    /* Bildegalleri */
     .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-    .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; }
-    .bilde-galleri img:hover { opacity: 0.8; }
+    .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
+    .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.0</span></h1>
+    <h1>Modellkontroll <span class="version">v2.1</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -105,7 +113,6 @@
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <!-- Valg av kontrollfase -->
   <select id="faseFilter" onchange="byttFase(this.value)" style="font-weight: 600; color: var(--blue);">
     <option value="Egenkontroll">1. Egenkontroll</option>
     <option value="Oppretting Egen">2. Oppretting etter Egenkontroll</option>
@@ -113,12 +120,11 @@
     <option value="Oppretting Fag">4. Oppretting etter Fagkontroll</option>
   </select>
   
-  <!-- Valg av modeller -->
   <div class="model-selector">
-    <button class="btn" id="modelBtn" onclick="toggleModelDropdown()">📦 Velg modeller i visning ▼</button>
+    <button class="btn" id="modelBtn" onclick="toggleModelDropdown()">📦 Velg modeller i visningen ▼</button>
     <div id="modelDropdown" class="model-dropdown">
       <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
-        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle modeller
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Alle modeller i visningen
       </label>
       <div id="modelList">
         <span style="font-size:10px; color:var(--muted);">Laster modeller fra Trimble...</span>
@@ -128,7 +134,10 @@
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <input type="text" id="brukerInitialer" placeholder="Initialer" style="width:70px;">
+  <div class="signatur-boks">
+    <label for="brukerInitialer">Signatur:</label>
+    <input type="text" id="brukerInitialer" placeholder="F.eks. OLA" style="width:75px; text-transform: uppercase;">
+  </div>
   <button class="btn" id="signerBtn" onclick="signerFase()">✍️ Signer aktiv fase</button>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
@@ -148,13 +157,10 @@ let API = null;
 let strukturData = null; 
 let valgtFag = '';
 let aktivFase = 'Egenkontroll';
-let tilgjengeligeModeller = []; // Modeller fra API
-let valgteModeller = []; // Modeller huket av
+let tilgjengeligeModeller = []; 
+let valgteModeller = []; 
 
-// Definerte faser for historikk-håndtering
 const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppretting Fag'];
-
-// ksData struktureres nå slik: ksData[punktId][faseNavn] = { status, kommentar, bilder: [] }
 let ksData = {};         
 let signaturData = {}; 
 
@@ -168,7 +174,6 @@ async function init() {
     hentModeller();
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
-    // Mock modeller
     tilgjengeligeModeller = [{id: 'm1', name: 'Veg_Hovedmodell.ifc'}, {id: 'm2', name: 'Rekkverk_E6.ifc'}];
     tegnModellListe();
   }
@@ -178,7 +183,6 @@ async function init() {
     if (!response.ok) throw new Error("Nettverksrespons var ikke OK");
     strukturData = await response.json();
     
-    // Sett opp fag-meny
     const select = $('fagFilter');
     select.innerHTML = '';
     for (const fagNokkel in strukturData) {
@@ -239,7 +243,7 @@ function toggleAlleModeller(masterCheckbox) {
 function oppdaterValgteModeller() {
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   valgteModeller = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-  $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
+  $('modelBtn').innerText = `📦 Modeller i visning (${valgteModeller.length} valgt) ▼`;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
 
@@ -259,7 +263,6 @@ function byttFag(fagNokkel) {
 function byttFase(fase) {
   aktivFase = fase;
   
-  // Modeller låses etter Egenkontroll for å sikre konsistens
   const modelBtn = $('modelBtn');
   if (aktivFase !== 'Egenkontroll') {
     modelBtn.disabled = true;
@@ -267,16 +270,15 @@ function byttFase(fase) {
     modelBtn.style.opacity = '0.7';
   } else {
     modelBtn.disabled = false;
-    modelBtn.innerText = `📦 Velg modeller i visning ▼`;
+    modelBtn.innerText = `📦 Velg modeller i visningen ▼`;
     modelBtn.style.opacity = '1';
-    oppdaterValgteModeller(); // Oppdaterer teksten med antall
+    oppdaterValgteModeller(); 
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
-  tegnKategorier(); // Tegn grensesnittet på nytt med riktig fase åpen
+  tegnKategorier(); 
 }
 
-// Sikrer at alle punkter eksisterer i datastrukturen for alle faser
 function byggDataStruktur() {
   const kat = strukturData[valgtFag].kategorier;
   kat.forEach(k => {
@@ -291,12 +293,12 @@ function byggDataStruktur() {
   });
 }
 
-// Konverterer statuskode til lesbar tekst og farge
 function getStatusFormat(kode) {
   switch(kode) {
-    case 'OK': return { tekst: 'Ingen avvik, OK', css: 'ok', fargeValg: '#dcfce7' };
-    case 'INFO': return { tekst: 'Ingen avvik, forbedringsforslag', css: 'info', fargeValg: '#fef08a' };
-    case 'AVVIK': return { tekst: 'Avvik funnet, må rettes', css: 'avvik', fargeValg: '#fee2e2' };
+    case 'OK': return { tekst: 'Ingen avvik, OK', css: 'ok', fargeValg: 'var(--green-dim)' };
+    case 'INFO': return { tekst: 'Ingen avvik, forbedringsforslag', css: 'info', fargeValg: 'var(--yellow-dim)' };
+    case 'AVVIK': return { tekst: 'Avvik funnet, må rettes', css: 'avvik', fargeValg: 'var(--red-dim)' };
+    case 'IR': return { tekst: 'Ikke relevant', css: 'ir', fargeValg: 'var(--surface2)' };
     default: return { tekst: 'Ikke vurdert', css: '', fargeValg: 'var(--bg)' };
   }
 }
@@ -321,7 +323,6 @@ function tegnKategorier() {
       const pktContainer = document.createElement('div');
       pktContainer.className = 'punkt-container';
       
-      // Tittel for sjekkpunktet
       const tittel = document.createElement('div');
       tittel.className = 'punkt-tekst-tittel';
       tittel.innerText = `${index + 1}. ${pkt.tekst}`;
@@ -329,7 +330,6 @@ function tegnKategorier() {
 
       const faseIndex = faseRekkefolge.indexOf(aktivFase);
       
-      // 1. TEGN HISTORIKK FOR TIDLIGERE FASER
       faseRekkefolge.forEach((faseNavn, i) => {
         if (i < faseIndex) {
           const historikkData = ksData[pkt.id][faseNavn];
@@ -360,38 +360,47 @@ function tegnKategorier() {
         }
       });
 
-      // 2. TEGN INPUT FOR AKTIV FASE
       const aktivData = ksData[pkt.id][aktivFase];
       const aktivBlokk = document.createElement('div');
-      aktivBlokk.className = 'aktiv-fase-boks';
+      aktivBlokk.className = 'aktiv-fase-boks border-default';
+      aktivBlokk.id = `aktivBoks_${pkt.id}`;
       
       aktivBlokk.innerHTML = `
         <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
         <div class="input-rad">
           <select class="status-velger" id="status_${pkt.id}">
-            <option value="">- Velg status for funn -</option>
+            <option value="">- Velg status -</option>
             <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
             <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
             <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
+            <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
           </select>
           
           <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv din kommentar her...">${aktivData.kommentar}</textarea>
           
-          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Legg til bilde</button>
+          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Bilde</button>
         </div>
         <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
       `;
       pktContainer.appendChild(aktivBlokk);
       body.appendChild(pktContainer);
 
-      // DOM-håndtering etter innsetting
       setTimeout(() => {
-        oppdaterGalleriUI(pkt.id); // Viser allerede lagrede bilder
+        oppdaterGalleriUI(pkt.id); 
         
         const sel = $(`status_${pkt.id}`);
         const kom = $(`komm_${pkt.id}`);
+        const boks = $(`aktivBoks_${pkt.id}`);
         
-        const sjekkValidering = () => {
+        const oppdaterFargeOgStil = () => {
+          boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
+          
+          if (sel.value === 'OK') boks.classList.add('border-ok');
+          else if (sel.value === 'INFO') boks.classList.add('border-info');
+          else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
+          else if (sel.value === 'IR') boks.classList.add('border-ir');
+          else boks.classList.add('border-default');
+
           if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
             kom.classList.add('validering-feil');
           } else {
@@ -402,17 +411,17 @@ function tegnKategorier() {
         
         sel.addEventListener('change', (e) => {
           ksData[pkt.id][aktivFase].status = e.target.value;
-          sjekkValidering();
+          oppdaterFargeOgStil();
           $('syncStatus').innerText = '🟠 Ulagrede endringer';
         });
         
         kom.addEventListener('input', (e) => {
           ksData[pkt.id][aktivFase].kommentar = e.target.value;
-          sjekkValidering();
+          oppdaterFargeOgStil();
           $('syncStatus').innerText = '🟠 Ulagrede endringer';
         });
         
-        sjekkValidering();
+        oppdaterFargeOgStil();
       }, 0);
     });
 
@@ -441,14 +450,12 @@ function validerAktivFase() {
   return !harFeil;
 }
 
-// Bildehåndtering med støtte for array
 async function taBilde(punktId) {
   try {
     let base64;
     if (API && API.viewer && typeof API.viewer.getSnapshot === 'function') {
       base64 = await API.viewer.getSnapshot();
     } else {
-      // Fallback
       const canvas = document.createElement('canvas');
       canvas.width = 300; canvas.height = 150;
       const ctx = canvas.getContext('2d');
@@ -458,7 +465,6 @@ async function taBilde(punktId) {
       base64 = canvas.toDataURL();
     }
     
-    // Legg bildet til i arrayen for aktiv fase
     ksData[punktId][aktivFase].bilder.push(base64);
     oppdaterGalleriUI(punktId);
     
@@ -481,7 +487,7 @@ function oppdaterGalleriUI(punktId) {
     img.src = b64;
     img.title = "Klikk for å fjerne bilde";
     img.onclick = () => {
-      if(confirm("Slette dette bildet?")) {
+      if(confirm("Vil du slette dette bildet?")) {
         ksData[punktId][aktivFase].bilder.splice(imgIndex, 1);
         oppdaterGalleriUI(punktId);
         $('syncStatus').innerText = '🟠 Ulagrede endringer';
@@ -528,7 +534,6 @@ function eksporterPDF() {
     return;
   }
 
-  // Åpne alle faner for print
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
   document.querySelectorAll('.kategori-header span:first-child').forEach(el => {
     el.innerText = el.innerText.replace('▶', '▼');
