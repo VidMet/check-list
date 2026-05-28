@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.2</title>
+  <title>Modellkontroll v2.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -40,7 +40,7 @@
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
     
     .model-selector { position: relative; display: inline-block; }
-    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 250px; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
     .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
     .model-label:hover { background: var(--bg); }
@@ -94,12 +94,11 @@
     .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
     .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    /* PDF Eksport styling (Tvinges på før html2pdf kjører) */
+    /* PDF Eksport styling (Har fjernet overstyringen av farger på aktiv-fase-boks for å beholde fargene i PDF) */
     .pdf-mode .kamera-btn { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; }
     .pdf-mode select::-ms-expand { display: none; }
-    .pdf-mode .aktiv-fase-boks { border-color: var(--border) !important; background: var(--surface) !important; }
     .pdf-mode .fase-tittel { color: var(--ink); }
     .pdf-mode .punkt-kommentar { border: none !important; background: transparent !important; padding: 0 !important; font-style: italic; }
   </style>
@@ -108,7 +107,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.2</span></h1>
+    <h1>Modellkontroll <span class="version">v2.3</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div>
@@ -135,7 +134,7 @@
     <button class="btn" id="modelBtn" onclick="toggleModelDropdown()">📦 Velg modeller i visningen ▼</button>
     <div id="modelDropdown" class="model-dropdown">
       <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
-        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Alle modeller i visningen
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visning
       </label>
       <div id="modelList">
         <span style="font-size:10px; color:var(--muted);">Laster modeller fra Trimble...</span>
@@ -173,8 +172,8 @@
       <tbody id="sumSignaturer"></tbody>
     </table>
     <div style="font-size: 12px;">
-      <strong>Kontrollerte modeller:</strong><br>
-      <span id="sumModeller" style="color: var(--muted); font-family: var(--mono);"></span>
+      <strong>Kontrollerte modeller i 3D-visning:</strong><br>
+      <div id="sumModeller" style="color: var(--ink); font-family: var(--sans);"></div>
     </div>
   </div>
 
@@ -235,10 +234,14 @@ async function init() {
   }
 }
 
+// Henter KUN modeller som er synlige/lastet i vieweren
 async function hentModeller() {
   try {
     const models = await API.viewer.getModels();
-    tilgjengeligeModeller = models.map(m => ({ id: m.modelId || m.id, name: m.name }));
+    // Forsøker å filtrere ut modeller som kanskje er skjult (hvis API-et støtter visible-flagget)
+    tilgjengeligeModeller = models
+      .filter(m => m.visible !== false)
+      .map(m => ({ id: m.modelId || m.id, name: m.name }));
     tegnModellListe();
   } catch(e) {
     console.error("Kunne ikke hente modeller", e);
@@ -250,7 +253,7 @@ function tegnModellListe() {
   container.innerHTML = '';
   
   if(tilgjengeligeModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller funnet i visningen.</span>';
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen.</span>';
     return;
   }
   
@@ -322,14 +325,12 @@ function byggDataStruktur() {
   });
 }
 
-// Funksjon for frie kontrollpunkter
 function leggTilFrittPunkt() {
   const tekst = prompt("Skriv inn overskrift/beskrivelse for det nye funnet:");
   if(!tekst || tekst.trim() === '') return;
   
   const id = 'fri_' + Date.now();
   
-  // Finn eller lag kategorien
   let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
   if(!egendefKat) {
     egendefKat = { navn: "Egendefinerte punkter", punkter: [] };
@@ -346,7 +347,6 @@ function leggTilFrittPunkt() {
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
   
-  // Scroll helt ned
   setTimeout(() => {
     $('exportContainer').scrollTop = $('exportContainer').scrollHeight;
   }, 100);
@@ -559,7 +559,7 @@ function oppdaterGalleriUI(punktId) {
 function signerFase() {
   const initialer = $('brukerInitialer').value.trim();
   if (!initialer) {
-    alert("Vennligst skriv inn initialene dine i tekstfeltet for signatur.");
+    alert("Vennligst skriv inn initialene dine i signatur-feltet øverst.");
     return;
   }
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -589,7 +589,13 @@ function oppdaterSignaturVisning() {
 
 function byggPDFSummary() {
   $('sumFag').innerText = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "";
-  $('sumModeller').innerText = valgteModeller.length > 0 ? valgteModeller.join(', ') : 'Alle modeller i visningen';
+  
+  // Bygger opp en punktliste for modellene i oppsummeringen
+  if (valgteModeller.length > 0) {
+    $('sumModeller').innerHTML = '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' + valgteModeller.map(m => `<li>${m}</li>`).join('') + '</ul>';
+  } else {
+    $('sumModeller').innerHTML = '<i>Ingen spesifikke modeller avkrysset</i>';
+  }
   
   const tbody = $('sumSignaturer');
   tbody.innerHTML = '';
@@ -608,24 +614,22 @@ function eksporterPDF() {
     return;
   }
 
-  // Åpne alle faner for print
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
   document.querySelectorAll('.kategori-header span:first-child').forEach(el => {
     el.innerText = el.innerText.replace('▶', '▼');
   });
 
-  // Skjul tomme kommentarer og tilpass høyder før print
   const container = $('exportContainer');
   container.classList.add('pdf-mode');
+  
   document.querySelectorAll('.punkt-kommentar').forEach(txt => {
     if(txt.value.trim() === '') {
       txt.classList.add('hide-empty');
     } else {
-      txt.style.height = txt.scrollHeight + 'px'; // Sørger for at all tekst vises
+      txt.style.height = txt.scrollHeight + 'px'; 
     }
   });
 
-  // Klargjør og vis oppsummeringstabellen
   byggPDFSummary();
   $('pdfSummary').style.display = 'block';
 
@@ -644,7 +648,6 @@ function eksporterPDF() {
   setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.');
   
   html2pdf().set(opt).from(container).save().then(() => {
-    // Rydd opp og tilbakestill visningen etter utskrift
     container.classList.remove('pdf-mode');
     $('pdfSummary').style.display = 'none';
     document.querySelectorAll('.punkt-kommentar').forEach(txt => {
@@ -672,7 +675,7 @@ function lagreTilProsjekt() {
       signaturer: signaturData
     },
     kontrollData: ksData,
-    strukturDataEndringer: strukturData // Lagrer også strukturen i tilfelle frie punkter ble lagt til
+    strukturDataEndringer: strukturData 
   };
   
   setTimeout(() => {
