@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="nb">
 <head>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <meta charset="UTF-8"/>
   <title>KS-Verktøy Trimble</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700&display=swap');
@@ -13,52 +14,61 @@
     :root {
       --bg: #f3f4f6; --surface: #ffffff; --surface2: #e5e7eb; --border: #d1d5db; 
       --ink: #111827; --muted: #6b7280; --blue: #1d4ed8; --blue-dim: #dbeafe;
+      --green: #166534;
       --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
+    /* Header og Toppmeny */
     header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .header-info h1 { font-size: 16px; font-weight: 700; }
     .header-info p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
     
-    .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 15px; align-items: center; flex-shrink: 0; }
-    .toolbar select, .btn { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
+    .toolbar select, .toolbar input, .btn { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .toolbar input { cursor: text; }
+    
     .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; }
     .btn:hover { background: var(--border); }
     .btn-primary { background: var(--blue); color: white; border: none; }
     .btn-primary:hover { background: #1e40af; }
-
+    
+    /* Signatur- og statusfelt */
+    #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); }
+    .cloud-sync { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--green); font-family: var(--mono); font-weight: bold; }
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
     /* Trekkspill-kategorier (Accordion) */
-    .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+    .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
     .kategori-header:hover { background: #d1d5db; }
     .kategori-body { display: none; flex-direction: column; }
     
-    /* Enkeltlinje-designet */
-    .punkt-container { border-top: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; background: var(--surface); }
-    .punkt-rad { display: grid; grid-template-columns: 140px 1fr 200px 32px; gap: 12px; align-items: center; }
+    /* Enkeltlinje-designet for sjekkpunkter */
+    .punkt-container { border-top: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; background: var(--surface); page-break-inside: avoid; }
+    .punkt-rad { display: grid; grid-template-columns: 160px 1fr 200px 32px; gap: 12px; align-items: center; }
     
-    .status-velger { font-size: 11px; font-family: var(--mono); padding: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
-    .status-velger.egenkontroll { background: #fef08a; border-color: #ca8a04; }
-    .status-velger.fagkontroll { background: #dcfce7; border-color: #166534; }
+    .status-velger { font-size: 11px; font-family: var(--mono); padding: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); outline: none; }
+    
+    /* Fargekoder for status */
+    .status-velger.egen-ok { background: #dcfce7; border-color: #166534; color: #166534; font-weight: 600; }
+    .status-velger.egen-komm { background: #fef08a; border-color: #ca8a04; color: #854d0e; font-weight: 600; }
+    .status-velger.fag-ok { background: #dbeafe; border-color: #1e3a8a; color: #1e3a8a; font-weight: 600; }
+    .status-velger.fag-komm { background: #ffedd5; border-color: #c2410c; color: #9a3412; font-weight: 600; }
     .status-velger.ir { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
     
     .punkt-tekst { font-size: 12px; line-height: 1.4; }
-    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; }
+    .punkt-kommentar { font-size: 11px; font-family: var(--sans); padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; outline: none; }
     
     .kamera-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.6; transition: opacity 0.2s; }
     .kamera-btn:hover { opacity: 1; }
     
     .bilde-ramme { margin-top: 8px; display: none; border-left: 2px solid var(--blue); padding-left: 10px; }
-    .bilde-ramme img { max-height: 200px; border: 1px solid var(--border); border-radius: 4px; }
-    
-    .cloud-sync { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--green); font-family: var(--mono); font-weight: bold; }
+    .bilde-ramme img { max-height: 250px; max-width: 100%; border: 1px solid var(--border); border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -66,7 +76,7 @@
 <header>
   <div class="header-info">
     <h1>Kvalitetskontroll BIM</h1>
-    <p>Prosjektoppsett</p>
+    <p>Prosjektoppsett og fagkontroll</p>
   </div>
   <div class="cloud-sync">
     <span id="syncStatus">🟢 Lese-modus</span>
@@ -79,47 +89,56 @@
     <option value="">Laster fag...</option>
   </select>
   
-  <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px; padding:6px; font-family:var(--sans); border:1px solid var(--border); border-radius:4px;">
-  <button class="btn btn-secondary" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Signer Egen</button>
-  <button class="btn btn-secondary" onclick="signerSkjema('fagkontroll')" style="background:#dcfce7; border-color:#166534;">✍️ Signer Fag</button>
+  <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <button class="btn" onclick="eksporterKort()">📄 Forenklet PDF</button>
+  <input type="text" id="brukerInitialer" placeholder="Dine initialer" style="width:100px;">
+  <button class="btn" onclick="signerSkjema('egenkontroll')" style="background:#fef08a; border-color:#ca8a04;">✍️ Signer Egen</button>
+  <button class="btn" onclick="signerSkjema('fagkontroll')" style="background:#dbeafe; border-color:#1e3a8a;">✍️ Signer Fag</button>
+  
+  <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
+  
+  <button class="btn" onclick="eksporterKort()">📄 Eksporter til PDF</button>
 </div>
 
-<div id="signaturInfo" style="padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono);">
-</div>
-
+<div id="signaturInfo"></div>
 <div id="statusBar">Venter på tilkobling...</div>
 
-<main id="listeInnhold">
-  </main>
+<main id="exportContainer">
+  <div id="listeInnhold">
+    </div>
+</main>
 
 <script>
 let API = null;
-let strukturData = null; // Holder data fra sjekklister.json
-let ksData = {};         // Holder status, kommentarer og bilder for punktene
+let strukturData = null; // Data fra sjekklister.json
+let ksData = {};         // Status, kommentarer og bilder for punktene
+let signaturData = { egenkontroll: null, fagkontroll: null }; // Holder på signaturer
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 
+// Initialisering
 async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
-    setStatus('✅ Tilkoblet Trimble Connect Workspace');
+    setStatus('✅ Tilkoblet Trimble Connect Workspace API');
   } catch(e) {
-    setStatus('⚠️ Kjører frittstående (Utenfor Trimble)');
+    setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
   }
   
-  // Last inn JSON-struktur
+  // Last inn sjekkliste-strukturen
   try {
     const response = await fetch('sjekklister.json');
+    if (!response.ok) throw new Error("Nettverksrespons var ikke OK");
     strukturData = await response.json();
     oppdaterFagDropdown();
   } catch(e) {
-    setStatus('❌ Kunne ikke laste sjekklister.json. Sjekk at den ligger i samme mappe.');
+    setStatus('❌ Kunne ikke laste sjekklister.json. Sjekk at den ligger i samme mappe og er gyldig JSON.');
+    console.error("Fetch feil:", e);
   }
 }
 
+// Oppdater dropdown for fag
 function oppdaterFagDropdown() {
   const select = $('fagFilter');
   select.innerHTML = '';
@@ -129,14 +148,13 @@ function oppdaterFagDropdown() {
     opt.innerText = strukturData[fagNokkel].navn;
     select.appendChild(opt);
   }
-  // Lytt på endringer
   select.addEventListener('change', (e) => tegnKategorier(e.target.value));
-  // Tegn første fag
   if (Object.keys(strukturData).length > 0) {
     tegnKategorier(Object.keys(strukturData)[0]);
   }
 }
 
+// Tegn opp kategorier og sjekkpunkter
 function tegnKategorier(fagNokkel) {
   const main = $('listeInnhold');
   main.innerHTML = '';
@@ -146,7 +164,6 @@ function tegnKategorier(fagNokkel) {
     const panel = document.createElement('div');
     panel.className = 'kategori-panel';
     
-    // Header for trekkspill
     const header = document.createElement('div');
     header.className = 'kategori-header';
     header.innerHTML = `<span>▶ ${kat.navn}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${kat.punkter.length} punkter</span>`;
@@ -154,9 +171,8 @@ function tegnKategorier(fagNokkel) {
     const body = document.createElement('div');
     body.className = 'kategori-body';
 
-    // Tegn selve linjene (punktene)
     kat.punkter.forEach(pkt => {
-      // Sørg for at punktet finnes i ksData for lagring av tilstand
+      // Sikre at ksData har et startpunkt for id-en
       if (!ksData[pkt.id]) ksData[pkt.id] = { status: 'Ubehandlet', kommentar: '', bilde: null };
       const lagret = ksData[pkt.id];
 
@@ -168,13 +184,15 @@ function tegnKategorier(fagNokkel) {
           <select class="status-velger" id="status_${pkt.id}">
             <option value="Ubehandlet" ${lagret.status === 'Ubehandlet' ? 'selected' : ''}>- Ikke vurdert -</option>
             <option value="IR" ${lagret.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
-            <option value="Egenkontroll" ${lagret.status === 'Egenkontroll' ? 'selected' : ''}>Egenkontroll OK</option>
-            <option value="Fagkontroll" ${lagret.status === 'Fagkontroll' ? 'selected' : ''}>Fagkontroll OK</option>
+            <option value="Egen_OK" ${lagret.status === 'Egen_OK' ? 'selected' : ''}>Egenkontroll: OK</option>
+            <option value="Egen_Komm" ${lagret.status === 'Egen_Komm' ? 'selected' : ''}>Egenkontroll: Komm.</option>
+            <option value="Fag_OK" ${lagret.status === 'Fag_OK' ? 'selected' : ''}>Fagkontroll: OK</option>
+            <option value="Fag_Komm" ${lagret.status === 'Fag_Komm' ? 'selected' : ''}>Fagkontroll: Komm.</option>
           </select>
           
           <div class="punkt-tekst">${pkt.tekst}</div>
           
-          <input type="text" class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Kommentar..." value="${lagret.kommentar}">
+          <input type="text" class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar / avvik..." value="${lagret.kommentar}">
           
           <button class="kamera-btn" onclick="taBilde('${pkt.id}')" title="Ta skjermbilde fra 3D">📷</button>
         </div>
@@ -186,32 +204,35 @@ function tegnKategorier(fagNokkel) {
       body.appendChild(pktContainer);
     });
 
-    // Event listeners for å oppdatere state og farger dynamisk (settes etter HTML er lagt til DOM)
     panel.appendChild(header);
     panel.appendChild(body);
     main.appendChild(panel);
 
-    // Trekkspill-logikk
+    // Trekkspill-funksjon
     header.addEventListener('click', () => {
       const isOpen = body.style.display === 'flex';
       body.style.display = isOpen ? 'none' : 'flex';
       header.querySelector('span').innerText = `${isOpen ? '▶' : '▼'} ${kat.navn}`;
     });
 
-    // Logikk for inputfelt
+    // Lyttere for statusfarger og lagring av tekst
     kat.punkter.forEach(pkt => {
       const sel = $(`status_${pkt.id}`);
+      
       const oppdaterFarge = () => {
-        sel.className = 'status-velger';
-        if (sel.value === 'Egenkontroll') sel.classList.add('egenkontroll');
-        if (sel.value === 'Fagkontroll') sel.classList.add('fagkontroll');
+        sel.className = 'status-velger'; // Nullstill klasser
+        if (sel.value === 'Egen_OK') sel.classList.add('egen-ok');
+        if (sel.value === 'Egen_Komm') sel.classList.add('egen-komm');
+        if (sel.value === 'Fag_OK') sel.classList.add('fag-ok');
+        if (sel.value === 'Fag_Komm') sel.classList.add('fag-komm');
         if (sel.value === 'IR') sel.classList.add('ir');
+        
         ksData[pkt.id].status = sel.value;
         $('syncStatus').innerText = '🟠 Ulagrede endringer';
       };
       
       sel.addEventListener('change', oppdaterFarge);
-      oppdaterFarge(); // Sett farge ved innlasting
+      oppdaterFarge(); // Kaller en gang for å sette riktig farge ved load
 
       $(`komm_${pkt.id}`).addEventListener('input', (e) => {
         ksData[pkt.id].kommentar = e.target.value;
@@ -221,51 +242,64 @@ function tegnKategorier(fagNokkel) {
   });
 }
 
+// Bildehåndtering via Trimble Connect Workspace API
 async function taBilde(punktId) {
   const ramme = $(`ramme_${punktId}`);
   const img = $(`bilde_${punktId}`);
   
   try {
     if (API && API.viewer) {
-      // Den korrekte metoden i Workspace API-et er getSnapshot()
-      const base64 = await API.viewer.getSnapshot();
-      
+      let base64;
+      if (typeof API.viewer.getSnapshot === 'function') {
+        base64 = await API.viewer.getSnapshot();
+      } else {
+        throw new Error("getSnapshot()-metoden mangler i dette API-et");
+      }
+
       img.src = base64;
       ramme.style.display = 'block';
       ksData[punktId].bilde = base64;
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      
+      setStatus(`📷 Skjermbilde lagret for valgt punkt.`);
     } else {
       throw new Error("Mangler kontakt med Trimble API");
     }
   } catch (e) {
     console.error("Feil ved skjermbilde:", e);
-    alert("Kunne ikke ta bilde fra 3D-modellen. Sjekk konsollen (F12) for detaljer.\nFeilmelding: " + e.message);
+    
+    // Fallback for lokal testing
+    const canvas = document.createElement('canvas');
+    canvas.width = 400; canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,400,200);
+    ctx.fillStyle = '#0f172a'; ctx.font = '14px sans-serif'; 
+    ctx.fillText('Demo: Bilde fra 3D (Kjører lokalt)', 90, 105);
+    
+    img.src = canvas.toDataURL();
+    ramme.style.display = 'block';
+    ksData[punktId].bilde = img.src;
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus(`⚠️ Lagt inn demo-bilde (Feil: ${e.message})`);
   }
 }
 
-// Nytt objekt for å holde på signaturer
-let signaturData = { egenkontroll: null, fagkontroll: null };
-
+// Signaturer
 function signerSkjema(type) {
   const initialer = $('brukerInitialer').value.trim();
-  
   if (!initialer) {
     alert("Vennligst skriv inn initialene dine i tekstfeltet før du signerer.");
     return;
   }
   
-  // Henter nøyaktig dato og tid
   const dato = new Date().toLocaleString('no-NB', { 
     year: 'numeric', month: '2-digit', day: '2-digit', 
     hour: '2-digit', minute: '2-digit' 
   });
   
-  // Lagrer signaturen i minnet
   signaturData[type] = { initialer: initialer, dato: dato };
-  
   oppdaterSignaturVisning();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus(`✍️ Skjema signert for ${type}.`);
 }
 
 function oppdaterSignaturVisning() {
@@ -285,37 +319,55 @@ function oppdaterSignaturVisning() {
   }
 }
 
-function lagreTilProsjekt() {
-  // Her vil Trimble File API (eller Extension API) koden implementeres for å skrive ksData til skyen.
-  // Som demonstrasjon simulerer vi en opplasting.
-  $('syncStatus').innerText = '⏳ Synkroniserer...';
-  setTimeout(() => {
-    $('syncStatus').innerText = '🟢 Synkronisert med Trimble';
-    setStatus('Skjema lagret til skyen (Simulert)');
-    console.log("Data som sendes til Trimble:", JSON.stringify(ksData));
-  }, 1000);
-}
-
+// PDF Eksport
 function eksporterKort() {
-  const element = $('listeInnhold');
-  const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex].text;
+  // Åpner alle trekkspill før eksport for å få med alt i PDF-en
+  document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
+  document.querySelectorAll('.kategori-header span:first-child').forEach(el => {
+    el.innerText = el.innerText.replace('▶', '▼');
+  });
+
+  const element = $('exportContainer');
+  const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "Eksport";
   const dato = new Date().toISOString().slice(0, 10);
   
   const opt = {
-    margin:       10,
+    margin:       [15, 10, 15, 10], // top, left, bottom, right
     filename:     `KS_Sjekkliste_${fagNavn}_${dato}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2 },
+    html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  setStatus('⏳ Genererer PDF...');
+  setStatus('⏳ Genererer PDF... Vennligst vent.');
+  
   html2pdf().set(opt).from(element).save().then(() => {
-    setStatus('✅ PDF eksportert til nedlastinger.');
+    setStatus('✅ PDF generert og lagt i nedlastinger.');
   });
 }
 
-// Start applikasjonen
+// Skysynkronisering (Mockup inntil videre)
+function lagreTilProsjekt() {
+  $('syncStatus').innerText = '⏳ Synkroniserer...';
+  
+  // Her lages objektet som i fremtiden skal sendes via Trimble File API
+  const eksportData = {
+    metadata: {
+      fag: $('fagFilter').value,
+      dato: new Date().toISOString(),
+      signaturer: signaturData
+    },
+    kontrollData: ksData
+  };
+  
+  setTimeout(() => {
+    $('syncStatus').innerText = '🟢 Synkronisert med Trimble';
+    setStatus('Skjema lagret til prosjekthotell (Simulert - sjekk konsoll for data)');
+    console.log("JSON som vil bli skrevet til Trimble:", eksportData);
+  }, 1200);
+}
+
+// Start appen
 init();
 </script>
 </body>
