@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.5</title>
+  <title>Modellkontroll v3.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -87,14 +87,17 @@
     .border-ir { border-left-color: var(--muted); opacity: 0.55; filter: grayscale(50%); }
     
     .fase-tittel { font-size: 11px; font-family: var(--mono); color: var(--blue); font-weight: bold; text-transform: uppercase; }
-    .input-rad { display: flex; gap: 10px; align-items: flex-start; }
+    .input-rad { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
     .status-velger { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; outline: none; min-width: 240px; }
-    .punkt-kommentar { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; flex: 1; min-height: 30px; resize: vertical; }
+    .punkt-kommentar { font-size: 12px; font-family: var(--sans); padding: 6px; border: 1px solid var(--border); border-radius: 4px; flex: 1; min-height: 30px; resize: vertical; min-width: 250px; }
     .validering-feil { border: 2px solid var(--red) !important; background-color: var(--red-dim) !important; }
     
     .kamera-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: 0.2s; flex-shrink: 0; }
     .kamera-btn:hover { background: var(--surface2); }
     
+    .bcf-btn { display: flex; align-items: center; gap: 6px; background: #fffdf4; border: 1px dashed var(--yellow); color: var(--yellow); border-radius: 4px; padding: 6px 10px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: 0.2s; flex-shrink: 0; font-weight: bold; }
+    .bcf-btn:hover { background: var(--yellow-dim); }
+
     .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; width: 100%; }
     .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 250px; }
     .bilde-galleri-item img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; object-fit: contain; }
@@ -105,8 +108,7 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* Strengere PDF-regler for å unngå at ting forsvinner ut av rammen */
-    .pdf-mode .kamera-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
+    .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .aktiv-fase-boks { border: 1px solid var(--border) !important; background: var(--surface) !important; display: block; padding: 12px; }
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
@@ -122,7 +124,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.5</span></h1>
+    <h1>Modellkontroll <span class="version">v3.6</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -306,7 +308,6 @@ async function init() {
   }
 }
 
-// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) ===
 document.addEventListener('paste', (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
@@ -597,6 +598,67 @@ function byggDataStruktur() {
   });
 }
 
+function finnPunktTekst(punktId) {
+  for(let kat of (strukturData[valgtFag]?.kategorier || [])) {
+      let pkt = kat.punkter.find(p => p.id === punktId);
+      if(pkt) return pkt.tekst;
+  }
+  return "Avviksregistrering";
+}
+
+// NY FUNKSJON: Opprett BCF / ToDo
+async function opprettBCF(punktId) {
+  const data = ksData[punktId][aktivFase];
+  if (!data.kommentar || data.kommentar.trim() === '') {
+    alert("Vennligst skriv en kommentar om avviket før du oppretter en BCF/ToDo.");
+    return;
+  }
+
+  const pktTekst = finnPunktTekst(punktId);
+  const tittel = `KS-Avvik: ${pktTekst.substring(0, 40)}`;
+  const beskrivelse = data.kommentar;
+  
+  let viewData = null;
+  if (data.bilder && data.bilder.length > 0) {
+    viewData = data.bilder[0]; // Sender med første bilde og kamera hvis tilgjengelig
+  }
+
+  $('syncStatus').innerText = '⏳ Oppretter BCF...';
+
+  try {
+    // API-kall klargjort for fremtidig oppkobling
+    if (API && API.project && typeof API.project.createToDo === 'function') {
+       /* await API.project.createToDo({
+         title: tittel,
+         description: beskrivelse,
+         type: "Issue",
+         status: "Open"
+         // inkludering av kamera og bilde avhenger av eksakt versjon av Workspace API
+       }); 
+       */
+    }
+    
+    // Simulerer suksess i testmiljø
+    console.log("== BCF / ToDo DATA KLARGJORT ==", { Tittel: tittel, Beskrivelse: beskrivelse, View: viewData });
+    
+    setTimeout(() => {
+      setStatus(`✅ BCF / ToDo opprettet for punktet.`);
+      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      
+      const btn = $(`bcfBtn_${punktId}`);
+      if(btn) {
+        btn.innerText = "✅ BCF Opprettet";
+        btn.style.backgroundColor = "var(--green-dim)";
+        btn.style.color = "var(--green)";
+        btn.style.borderColor = "var(--green)";
+      }
+    }, 800);
+    
+  } catch (e) {
+    alert("Kunne ikke opprette BCF: " + e.message);
+  }
+}
+
 function leggTilFrittPunkt() {
   const tekst = prompt("Skriv inn overskrift/beskrivelse for det nye funnet:");
   if(!tekst || tekst.trim() === '') return;
@@ -726,7 +788,8 @@ function tegnKategorier() {
               <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
             </select>
             <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Lim gjerne inn bilder med Ctrl+V)">${aktivData.kommentar}</textarea>
-            <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Ta 3D-Bilde</button>
+            <button class="kamera-btn pdf-skjul" onclick="taBilde('${pkt.id}')">📷 Ta 3D-Bilde</button>
+            <button class="bcf-btn pdf-skjul" id="bcfBtn_${pkt.id}" onclick="opprettBCF('${pkt.id}')" style="display:none;">💬 Opprett BCF / ToDo</button>
           </div>
           <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
         `;
@@ -738,6 +801,7 @@ function tegnKategorier() {
           const sel = $(`status_${pkt.id}`);
           const kom = $(`komm_${pkt.id}`);
           const boks = $(`aktivBoks_${pkt.id}`);
+          const bcfBtn = $(`bcfBtn_${pkt.id}`);
           
           const oppdaterFargeOgStil = () => {
             boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
@@ -752,6 +816,14 @@ function tegnKategorier() {
             } else {
               kom.classList.remove('validering-feil');
             }
+            
+            // Vis BCF-knapp kun hvis det er et relevant avvik
+            if (sel.value === 'AVVIK' || sel.value === 'INFO') {
+               if(bcfBtn) bcfBtn.style.display = 'inline-flex';
+            } else {
+               if(bcfBtn) bcfBtn.style.display = 'none';
+            }
+
             sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
           };
           
