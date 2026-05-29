@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.0</title>
+  <title>Modellkontroll v3.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -53,7 +53,6 @@
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
-    /* Rapporteringsoppsummering */
     #pdfSummary { display: none; margin-bottom: 24px; padding: 16px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; page-break-after: avoid; }
     #pdfSummary h2 { font-size: 18px; margin-bottom: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 4px; }
     .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
@@ -100,7 +99,6 @@
     .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
     .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    /* Logg styling */
     .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); }
     .logg-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .logg-fase { font-weight: 600; color: var(--blue); }
@@ -118,7 +116,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.0</span></h1>
+    <h1>Modellkontroll <span class="version">v3.1</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -201,10 +199,10 @@
     </div>
     <div class="kategori-body" id="beskrivelseKropp" style="display: flex; padding: 14px; gap: 10px; flex-direction: column;">
       <div class="input-rad">
-        <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Skriv en generell beskrivelse av kontrollens omfang og forutsetninger her..."></textarea>
+        <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Skriv beskrivelse... (Tips: Du kan lime inn skjermbilder direkte her med Ctrl+V)"></textarea>
       </div>
       <div class="input-rad pdf-skjul">
-        <button class="kamera-btn" onclick="taBildeBeskrivelse()">📷 Legg til bilde i beskrivelsen</button>
+        <button class="kamera-btn" onclick="taBildeBeskrivelse()">📷 Legg til 3D-bilde i beskrivelsen</button>
       </div>
       <div class="bilde-galleri" id="beskrivelseGalleri"></div>
     </div>
@@ -249,7 +247,6 @@ const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppre
 let ksData = {};         
 let signaturData = {}; 
 
-// Nye data-containere
 let beskrivelseData = { tekst: '', bilder: [] };
 let oppsummeringLogg = [];
 
@@ -311,7 +308,60 @@ async function init() {
   }
 }
 
-// === NY BILDE-LOGIKK FOR BESKRIVELSE ===
+// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V for skjermbilder) ===
+document.addEventListener('paste', (e) => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  let imageItem = null;
+  
+  for (let item of items) {
+    if (item.type.indexOf('image') === 0) {
+      imageItem = item;
+      break;
+    }
+  }
+  
+  // Hvis det ikke var et bilde som ble limt inn, la nettleseren gjøre som normalt (lime inn tekst)
+  if (!imageItem) return;
+
+  const activeEl = document.activeElement;
+  let targetPunktId = null;
+  let isBeskrivelse = false;
+
+  if (activeEl && activeEl.id.startsWith('komm_')) {
+    targetPunktId = activeEl.id.replace('komm_', '');
+  } else if (activeEl && activeEl.id === 'beskrivelseTekst') {
+    isBeskrivelse = true;
+  } else {
+    setStatus("⚠️ Klikk inni et kommentarfelt før du trykker Ctrl+V for å lime inn et skjermbilde.");
+    return;
+  }
+
+  // Hindre bildet i å limes inn som "tekst"
+  e.preventDefault();
+  
+  const blob = imageItem.getAsFile();
+  const reader = new FileReader();
+  
+  reader.onload = (event) => {
+    const base64 = event.target.result;
+    
+    if (isBeskrivelse) {
+      beskrivelseData.bilder.push(base64);
+      oppdaterBeskrivelseGalleriUI();
+      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      setStatus('📋 Manuelt skjermbilde limt inn i generell beskrivelse.');
+    } else if (targetPunktId) {
+      ksData[targetPunktId][aktivFase].bilder.push(base64);
+      oppdaterGalleriUI(targetPunktId);
+      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      setStatus(`📋 Manuelt skjermbilde limt inn under ${aktivFase}.`);
+    }
+  };
+  
+  reader.readAsDataURL(blob);
+});
+
+// === BILDE-LOGIKK FOR BESKRIVELSE ===
 async function taBildeBeskrivelse() {
   try {
     let base64;
@@ -355,7 +405,6 @@ function oppdaterBeskrivelseGalleriUI() {
   });
 }
 
-// === LOGG OG OPPSUMMERING ===
 function leggTilLogg() {
   const tekst = $('nyOppsummeringTekst').value.trim();
   const init = $('brukerInitialer').value.trim();
@@ -403,7 +452,6 @@ function oppdaterOppsummeringUI() {
   });
 }
 
-// === RESTEN AV SYSTEMET ===
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
@@ -633,8 +681,8 @@ function tegnKategorier() {
             <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
             <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
           </select>
-          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv din kommentar her...">${aktivData.kommentar}</textarea>
-          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Bilde</button>
+          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Du kan også lime inn skjermbilder her med Ctrl+V)">${aktivData.kommentar}</textarea>
+          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 3D-Bilde</button>
         </div>
         <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
       `;
@@ -791,11 +839,10 @@ function byggPDFSummary() {
 
 function eksporterPDF() {
   if (!validerAktivFase()) {
-    alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før eksport.");
+    alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før eksport.");
     return;
   }
 
-  // Åpner alt for utskrift
   $('beskrivelseKropp').style.display = 'flex';
   $('beskrivelsePil').innerText = '▼ Generell beskrivelse av kontrollen';
   $('oppsummeringKropp').style.display = 'flex';
@@ -840,7 +887,6 @@ function eksporterPDF() {
   });
 }
 
-// NY "LAGRE SOM"-LOGIKK
 async function lagreLokalt() {
   if (!validerAktivFase()) {
     alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før lagring.");
@@ -865,7 +911,6 @@ async function lagreLokalt() {
   const forslattFilnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
 
   try {
-    // Sjekker om nettleseren støtter File System Access API (Gir brukeren "Lagre som"-dialogboks)
     if (window.showSaveFilePicker) {
       const handle = await window.showSaveFilePicker({
         suggestedName: forslattFilnavn,
@@ -881,7 +926,6 @@ async function lagreLokalt() {
       $('syncStatus').innerText = `🟢 Lagret (${aktivFase})`;
       setStatus(`✅ Filen ble lagret til ønsket plassering.`);
     } else {
-      // Fallback for eldre nettlesere som tvinger nedlasting via A-tag
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const lenke = document.createElement("a");
@@ -896,14 +940,13 @@ async function lagreLokalt() {
       setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
     }
   } catch (err) {
-    if (err.name !== 'AbortError') { // Ignorerer feil hvis brukeren trykker "Avbryt"
+    if (err.name !== 'AbortError') { 
       console.error(err);
       alert("En feil oppstod under lagring: " + err.message);
     }
   }
 }
 
-// INNLESING AV EKSISTERENDE JSON-FIL
 function lastInnFil(event) {
   const file = event.target.files[0];
   if (!file) return;
