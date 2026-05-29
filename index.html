@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.9</title>
+  <title>Modellkontroll v3.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -100,7 +100,13 @@
     .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
     .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    .pdf-mode .kamera-btn, .pdf-mode .slett-btn { display: none !important; }
+    /* Logg styling */
+    .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); }
+    .logg-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+    .logg-fase { font-weight: 600; color: var(--blue); }
+    .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
+
+    .pdf-mode .kamera-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; }
     .pdf-mode select::-ms-expand { display: none; }
@@ -112,7 +118,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.9</span></h1>
+    <h1>Modellkontroll <span class="version">v3.0</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -170,6 +176,8 @@
 
 <main id="exportContainer">
   <div id="pdfSummary">
+    <img src="norconsult-logo-black.png" alt="Norconsult" style="max-height: 40px; margin-bottom: 20px; display: block;">
+    
     <h2>Kontrollrapport: <span id="sumFag"></span></h2>
     <table class="summary-table">
       <thead>
@@ -182,16 +190,51 @@
       <tbody id="sumSignaturer"></tbody>
     </table>
     <div style="font-size: 12px;">
-      <strong>Kontrollerte modeller:</strong><br>
+      <strong>Kontrollerte modeller i 3D-visning:</strong><br>
       <div id="sumModeller" style="color: var(--ink); font-family: var(--sans);"></div>
+    </div>
+  </div>
+
+  <div class="kategori-panel" id="beskrivelsePanel">
+    <div class="kategori-header" onclick="toggleBeskrivelse()">
+      <span id="beskrivelsePil">▼ Generell beskrivelse av kontrollen</span>
+    </div>
+    <div class="kategori-body" id="beskrivelseKropp" style="display: flex; padding: 14px; gap: 10px; flex-direction: column;">
+      <div class="input-rad">
+        <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Skriv en generell beskrivelse av kontrollens omfang og forutsetninger her..."></textarea>
+      </div>
+      <div class="input-rad pdf-skjul">
+        <button class="kamera-btn" onclick="taBildeBeskrivelse()">📷 Legg til bilde i beskrivelsen</button>
+      </div>
+      <div class="bilde-galleri" id="beskrivelseGalleri"></div>
     </div>
   </div>
 
   <div id="listeInnhold"></div>
   
-  <div style="margin-top: 20px; padding-bottom: 40px; text-align: center;">
+  <div style="margin-top: 20px; text-align: center;" class="pdf-skjul">
     <button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="border: 1px dashed var(--muted); color: var(--muted);">➕ Legg til fritt kontrollpunkt</button>
   </div>
+
+  <div class="kategori-panel" style="margin-top: 30px;">
+    <div class="kategori-header" onclick="toggleOppsummering()">
+      <span id="oppsummeringPil">▼ Oppsummering og logg</span>
+    </div>
+    <div class="kategori-body" id="oppsummeringKropp" style="display: flex; padding: 14px; gap: 10px; flex-direction: column;">
+      <div id="oppsummeringListe">
+        <div style="font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 10px;">Ingen logger lagt til enda.</div>
+      </div>
+      
+      <div class="pdf-skjul" style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+        <label style="font-size: 11px; font-weight: 600; font-family: var(--mono);">Ny logg-innføring:</label>
+        <textarea id="nyOppsummeringTekst" class="punkt-kommentar" placeholder="Skriv kommentar/konklusjon og trykk legg til..."></textarea>
+        <div style="text-align: right;">
+          <button class="btn btn-secondary" onclick="leggTilLogg()">📝 Legg til i logg</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -206,9 +249,35 @@ const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppre
 let ksData = {};         
 let signaturData = {}; 
 
+// Nye data-containere
+let beskrivelseData = { tekst: '', bilder: [] };
+let oppsummeringLogg = [];
+
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
+
+// Lyttere for Beskrivelse
+$('beskrivelseTekst').addEventListener('input', (e) => {
+  beskrivelseData.tekst = e.target.value;
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+});
+
+function toggleBeskrivelse() {
+  const kropp = $('beskrivelseKropp');
+  const pil = $('beskrivelsePil');
+  const isOpen = kropp.style.display !== 'none';
+  kropp.style.display = isOpen ? 'none' : 'flex';
+  pil.innerText = `${isOpen ? '▶' : '▼'} Generell beskrivelse av kontrollen`;
+}
+
+function toggleOppsummering() {
+  const kropp = $('oppsummeringKropp');
+  const pil = $('oppsummeringPil');
+  const isOpen = kropp.style.display !== 'none';
+  kropp.style.display = isOpen ? 'none' : 'flex';
+  pil.innerText = `${isOpen ? '▶' : '▼'} Oppsummering og logg`;
+}
 
 async function init() {
   try {
@@ -238,19 +307,110 @@ async function init() {
       tegnKategorier();
     }
   } catch(e) {
-    setStatus('❌ Kunne ikke laste standard sjekklister.json.');
+    setStatus('❌ Kunne ikke laste sjekklister.json.');
   }
 }
 
+// === NY BILDE-LOGIKK FOR BESKRIVELSE ===
+async function taBildeBeskrivelse() {
+  try {
+    let base64;
+    if (API && API.viewer) {
+      const methods = [API.viewer.getSnapshot, API.viewer.getScreenshot, API.viewer.captureScreenshot];
+      for (let m of methods) { if (typeof m === 'function') { base64 = await m.bind(API.viewer)(); break; } }
+      if(!base64) throw new Error("Ingen metoder funnet.");
+    } else {
+      const canvas = document.createElement('canvas');
+      canvas.width = 300; canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0,0,300,150);
+      ctx.fillStyle = '#0f172a'; ctx.font = '12px sans-serif'; 
+      ctx.fillText(`Generelt Snap: ${new Date().toLocaleTimeString()}`, 50, 80);
+      base64 = canvas.toDataURL();
+    }
+    
+    beskrivelseData.bilder.push(base64);
+    oppdaterBeskrivelseGalleriUI();
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  } catch (e) {
+    alert("Kunne ikke ta bilde: " + e.message);
+  }
+}
+
+function oppdaterBeskrivelseGalleriUI() {
+  const galleri = $('beskrivelseGalleri');
+  galleri.innerHTML = '';
+  beskrivelseData.bilder.forEach((b64, imgIndex) => {
+    const img = document.createElement('img');
+    img.src = b64;
+    img.title = "Klikk for å fjerne bilde";
+    img.onclick = () => {
+      if(confirm("Vil du slette dette bildet fra beskrivelsen?")) {
+        beskrivelseData.bilder.splice(imgIndex, 1);
+        oppdaterBeskrivelseGalleriUI();
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      }
+    };
+    galleri.appendChild(img);
+  });
+}
+
+// === LOGG OG OPPSUMMERING ===
+function leggTilLogg() {
+  const tekst = $('nyOppsummeringTekst').value.trim();
+  const init = $('brukerInitialer').value.trim();
+  
+  if (!tekst) return;
+  if (!init) {
+    alert('Du må fylle inn signatur (initialer) i toppmenyen før du kan skrive i loggen.');
+    return;
+  }
+  
+  const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  
+  oppsummeringLogg.push({
+    fase: aktivFase,
+    initialer: init,
+    dato: dato,
+    tekst: tekst
+  });
+  
+  $('nyOppsummeringTekst').value = '';
+  oppdaterOppsummeringUI();
+  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+}
+
+function oppdaterOppsummeringUI() {
+  const liste = $('oppsummeringListe');
+  liste.innerHTML = '';
+  
+  if (oppsummeringLogg.length === 0) {
+    liste.innerHTML = '<div style="font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 10px;">Ingen logger lagt til enda.</div>';
+    return;
+  }
+  
+  oppsummeringLogg.forEach(logg => {
+    const div = document.createElement('div');
+    div.className = 'logg-element';
+    div.innerHTML = `
+      <div class="logg-header">
+        <span class="logg-fase">${logg.fase}</span>
+        <span>${logg.initialer} - ${logg.dato}</span>
+      </div>
+      <div class="logg-tekst">${logg.tekst}</div>
+    `;
+    liste.appendChild(div);
+  });
+}
+
+// === RESTEN AV SYSTEMET ===
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
-  
   try {
     if (API && API.viewer) {
       const nameMap = new Map();
       const srcs = [() => API.models?.getModels(), () => API.viewer?.getModels()];
-      
       for (const src of srcs) {
         try {
           const res = await src();
@@ -264,24 +424,16 @@ async function hentModeller() {
       }
 
       const objs = await API.viewer.getObjects();
-      
       const gyldigeModeller = (objs || []).map(m => {
-        const mid = m.modelId || m.modelid;
-        const objects = m.objects || [];
         return {
-          id: mid,
-          name: nameMap.get(mid) || m.name || 'Ukjent modell',
-          antallObjekter: objects.length
+          id: m.modelId || m.modelid,
+          name: nameMap.get(m.modelId || m.modelid) || m.name || 'Ukjent modell',
+          antallObjekter: (m.objects || []).length
         };
       }).filter(m => m.antallObjekter > 0); 
-
       tilgjengeligeModeller = gyldigeModeller.map(m => ({ id: m.id, name: m.name }));
-
     } else {
-      tilgjengeligeModeller = [
-        {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, 
-        {id: 'm2', name: 'E6_Rekkverk.ifc'}
-      ];
+      tilgjengeligeModeller = [ {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, {id: 'm2', name: 'E6_Rekkverk.ifc'} ];
     }
     
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
@@ -293,9 +445,7 @@ async function hentModeller() {
     
     scanBtn.innerText = `✅ Fant ${tilgjengeligeModeller.length} modeller`;
     setTimeout(() => { scanBtn.innerText = '🔍 Skann 3D-visning på nytt'; }, 3000);
-    
   } catch(e) {
-    console.error("Feil under henting av modeller", e);
     scanBtn.innerText = '❌ Feil ved skann';
   }
 }
@@ -303,15 +453,11 @@ async function hentModeller() {
 function tegnModellListe() {
   const container = $('modelList');
   container.innerHTML = '';
-  
   if(tilgjengeligeModeller.length === 0 && valgteModeller.length === 0) {
     container.innerHTML = '<span style="font-size:10px;">Ingen modeller tilgjengelig.</span>';
     return;
   }
-  
-  // Viser de modellene som enten ligger i filen vi lastet, eller er scannet
   const modellerÅVise = tilgjengeligeModeller.length > 0 ? tilgjengeligeModeller.map(m=>m.name) : valgteModeller;
-  
   modellerÅVise.forEach(mName => {
     const isChecked = valgteModeller.includes(mName) ? 'checked' : '';
     const label = document.createElement('label');
@@ -322,20 +468,17 @@ function tegnModellListe() {
 }
 
 function toggleModelDropdown() { $('modelDropdown').classList.toggle('show'); }
-
 function toggleAlleModeller(masterCheckbox) {
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
   oppdaterValgteModeller();
 }
-
 function oppdaterValgteModeller() {
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   valgteModeller = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
   $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
-
 function lukkModelDropdown(e) {
   if (!$('modelBtn').contains(e.target) && !$('modelDropdown').contains(e.target)) {
     $('modelDropdown').classList.remove('show');
@@ -351,7 +494,6 @@ function byttFag(fagNokkel) {
 
 function byttFase(fase) {
   aktivFase = fase;
-  
   const modelBtn = $('modelBtn');
   const scanBtn = $('scanBtn');
   
@@ -390,42 +532,28 @@ function leggTilFrittPunkt() {
   if(!tekst || tekst.trim() === '') return;
   
   const id = 'fri_' + Date.now();
-  
   let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
   if(!egendefKat) {
     egendefKat = { navn: "Egendefinerte punkter", punkter: [] };
     strukturData[valgtFag].kategorier.push(egendefKat);
   }
-  
   egendefKat.punkter.push({ id: id, tekst: tekst });
-  
   ksData[id] = {};
-  faseRekkefolge.forEach(f => {
-    ksData[id][f] = { status: '', kommentar: '', bilder: [] };
-  });
+  faseRekkefolge.forEach(f => { ksData[id][f] = { status: '', kommentar: '', bilder: [] }; });
   
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
-  
-  setTimeout(() => {
-    $('exportContainer').scrollTop = $('exportContainer').scrollHeight;
-  }, 100);
+  setTimeout(() => { $('exportContainer').scrollTop = $('exportContainer').scrollHeight; }, 100);
 }
 
 function slettFrittPunkt(punktId) {
   if(!confirm("Er du sikker på at du vil slette dette egendefinerte punktet?")) return;
-  
   let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
   if(egendefKat) {
     egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
-    
-    if(egendefKat.punkter.length === 0) {
-      strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte punkter");
-    }
+    if(egendefKat.punkter.length === 0) strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte punkter");
   }
-  
   delete ksData[punktId];
-  
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
@@ -459,7 +587,6 @@ function tegnKategorier() {
     kat.punkter.forEach((pkt, index) => {
       const pktContainer = document.createElement('div');
       pktContainer.className = 'punkt-container';
-      
       const tittel = document.createElement('div');
       tittel.className = 'punkt-tekst-tittel';
       
@@ -471,29 +598,18 @@ function tegnKategorier() {
       pktContainer.appendChild(tittel);
 
       const faseIndex = faseRekkefolge.indexOf(aktivFase);
-      
       faseRekkefolge.forEach((faseNavn, i) => {
         if (i < faseIndex) {
           const historikkData = ksData[pkt.id][faseNavn];
           if (historikkData && historikkData.status !== '') {
             const histBlokk = document.createElement('div');
             histBlokk.className = 'historikk-blokk';
-            
             const format = getStatusFormat(historikkData.status);
-            
-            let html = `
-              <div class="historikk-header">
-                <span>Fase: ${faseNavn}</span>
-                <span class="historikk-status ${format.css}">${format.tekst}</span>
-              </div>
-            `;
+            let html = `<div class="historikk-header"><span>Fase: ${faseNavn}</span><span class="historikk-status ${format.css}">${format.tekst}</span></div>`;
             if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
-            
             if (historikkData.bilder && historikkData.bilder.length > 0) {
               html += `<div class="bilde-galleri" style="margin-top:8px;">`;
-              historikkData.bilder.forEach(b64 => {
-                html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`;
-              });
+              historikkData.bilder.forEach(b64 => { html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`; });
               html += `</div>`;
             }
             histBlokk.innerHTML = html;
@@ -517,9 +633,7 @@ function tegnKategorier() {
             <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
             <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
           </select>
-          
           <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv din kommentar her...">${aktivData.kommentar}</textarea>
-          
           <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Bilde</button>
         </div>
         <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
@@ -529,14 +643,12 @@ function tegnKategorier() {
 
       setTimeout(() => {
         oppdaterGalleriUI(pkt.id); 
-        
         const sel = $(`status_${pkt.id}`);
         const kom = $(`komm_${pkt.id}`);
         const boks = $(`aktivBoks_${pkt.id}`);
         
         const oppdaterFargeOgStil = () => {
           boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
-          
           if (sel.value === 'OK') boks.classList.add('border-ok');
           else if (sel.value === 'INFO') boks.classList.add('border-info');
           else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
@@ -562,7 +674,6 @@ function tegnKategorier() {
           oppdaterFargeOgStil();
           $('syncStatus').innerText = '🟠 Ulagrede endringer';
         });
-        
         oppdaterFargeOgStil();
       }, 0);
     });
@@ -596,15 +707,9 @@ async function taBilde(punktId) {
   try {
     let base64;
     if (API && API.viewer) {
-      if (typeof API.viewer.getSnapshot === 'function') {
-        base64 = await API.viewer.getSnapshot();
-      } else if (typeof API.viewer.getScreenshot === 'function') {
-        base64 = await API.viewer.getScreenshot();
-      } else if (typeof API.viewer.captureScreenshot === 'function') {
-        base64 = await API.viewer.captureScreenshot();
-      } else {
-        throw new Error("Fant ingen kompatibel skjermbildemetode.");
-      }
+      const methods = [API.viewer.getSnapshot, API.viewer.getScreenshot, API.viewer.captureScreenshot];
+      for (let m of methods) { if (typeof m === 'function') { base64 = await m.bind(API.viewer)(); break; } }
+      if(!base64) throw new Error("Ingen metoder funnet.");
     } else {
       const canvas = document.createElement('canvas');
       canvas.width = 300; canvas.height = 150;
@@ -614,16 +719,11 @@ async function taBilde(punktId) {
       ctx.fillText(`Snap: ${new Date().toLocaleTimeString()}`, 90, 80);
       base64 = canvas.toDataURL();
     }
-    
     ksData[punktId][aktivFase].bilder.push(base64);
     oppdaterGalleriUI(punktId);
-    
     $('syncStatus').innerText = '🟠 Ulagrede endringer';
     setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
-  } catch (e) {
-    console.error("Feil ved bilde", e);
-    alert("Kunne ikke ta bilde. Feilmelding: " + e.message);
-  }
+  } catch (e) { alert("Kunne ikke ta bilde. Feilmelding: " + e.message); }
 }
 
 function oppdaterGalleriUI(punktId) {
@@ -631,7 +731,6 @@ function oppdaterGalleriUI(punktId) {
   if(!galleri) return;
   galleri.innerHTML = '';
   const bilder = ksData[punktId][aktivFase].bilder || [];
-  
   bilder.forEach((b64, imgIndex) => {
     const img = document.createElement('img');
     img.src = b64;
@@ -649,12 +748,8 @@ function oppdaterGalleriUI(punktId) {
 
 function signerFase() {
   const initialer = $('brukerInitialer').value.trim();
-  if (!initialer) {
-    alert("Vennligst skriv inn initialene dine i signatur-feltet øverst.");
-    return;
-  }
+  if (!initialer) { alert("Vennligst skriv inn initialene dine i signatur-feltet øverst."); return; }
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-  
   signaturData[aktivFase] = { initialer: initialer, dato: dato };
   oppdaterSignaturVisning();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
@@ -664,7 +759,6 @@ function signerFase() {
 function oppdaterSignaturVisning() {
   const boks = $('signaturInfo');
   boks.innerHTML = '';
-  
   let harSignaturer = false;
   faseRekkefolge.forEach(fase => {
     if (signaturData[fase]) {
@@ -674,19 +768,16 @@ function oppdaterSignaturVisning() {
       harSignaturer = true;
     }
   });
-  
   boks.style.display = harSignaturer ? 'flex' : 'none';
 }
 
 function byggPDFSummary() {
   $('sumFag').innerText = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "";
-  
   if (valgteModeller.length > 0) {
     $('sumModeller').innerHTML = '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' + valgteModeller.map(m => `<li>${m}</li>`).join('') + '</ul>';
   } else {
     $('sumModeller').innerHTML = '<i>Ingen spesifikke modeller avkrysset</i>';
   }
-  
   const tbody = $('sumSignaturer');
   tbody.innerHTML = '';
   faseRekkefolge.forEach(fase => {
@@ -704,20 +795,21 @@ function eksporterPDF() {
     return;
   }
 
+  // Åpner alt for utskrift
+  $('beskrivelseKropp').style.display = 'flex';
+  $('beskrivelsePil').innerText = '▼ Generell beskrivelse av kontrollen';
+  $('oppsummeringKropp').style.display = 'flex';
+  $('oppsummeringPil').innerText = '▼ Oppsummering og logg';
+  
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
-  document.querySelectorAll('.kategori-header span:first-child').forEach(el => {
-    el.innerText = el.innerText.replace('▶', '▼');
-  });
+  document.querySelectorAll('.kategori-header span:first-child').forEach(el => { el.innerText = el.innerText.replace('▶', '▼'); });
 
   const container = $('exportContainer');
   container.classList.add('pdf-mode');
   
   document.querySelectorAll('.punkt-kommentar').forEach(txt => {
-    if(txt.value.trim() === '') {
-      txt.classList.add('hide-empty');
-    } else {
-      txt.style.height = txt.scrollHeight + 'px'; 
-    }
+    if(txt.value.trim() === '') txt.classList.add('hide-empty');
+    else txt.style.height = txt.scrollHeight + 'px'; 
   });
 
   byggPDFSummary();
@@ -730,7 +822,7 @@ function eksporterPDF() {
   const opt = {
     margin:       [15, 10, 15, 10], 
     filename:     `Modellkontroll_${fagNavn}_${rensFaseNavn}_${dato}.pdf`,
-    image:        { type: 'jpeg', quality: 0.95 },
+    image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
@@ -748,8 +840,8 @@ function eksporterPDF() {
   });
 }
 
-// LOKAL LAGRING AV JSON
-function lagreLokalt() {
+// NY "LAGRE SOM"-LOGIKK
+async function lagreLokalt() {
   if (!validerAktivFase()) {
     alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før lagring.");
     return;
@@ -761,27 +853,54 @@ function lagreLokalt() {
       sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
       modeller: valgteModeller,
-      signaturer: signaturData
+      signaturer: signaturData,
+      beskrivelseData: beskrivelseData,
+      oppsummeringLogg: oppsummeringLogg
     },
     kontrollData: ksData,
     strukturDataEndringer: strukturData 
   };
   
   const jsonString = JSON.stringify(eksportData, null, 2);
-  const filnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
-  const blob = new Blob([jsonString], { type: 'application/json' });
-  
-  const url = URL.createObjectURL(blob);
-  const lenke = document.createElement("a");
-  lenke.href = url;
-  lenke.download = filnavn;
-  document.body.appendChild(lenke);
-  lenke.click();
-  document.body.removeChild(lenke);
-  URL.revokeObjectURL(url);
-  
-  $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
-  setStatus(`✅ Filen ble lastet ned. Dra den inn i riktig mappe i Trimble Connect via nettleseren.`);
+  const forslattFilnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
+
+  try {
+    // Sjekker om nettleseren støtter File System Access API (Gir brukeren "Lagre som"-dialogboks)
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: forslattFilnavn,
+        types: [{
+          description: 'JSON Prosjektfil',
+          accept: {'application/json': ['.json']}
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(jsonString);
+      await writable.close();
+      
+      $('syncStatus').innerText = `🟢 Lagret (${aktivFase})`;
+      setStatus(`✅ Filen ble lagret til ønsket plassering.`);
+    } else {
+      // Fallback for eldre nettlesere som tvinger nedlasting via A-tag
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const lenke = document.createElement("a");
+      lenke.href = url;
+      lenke.download = forslattFilnavn;
+      document.body.appendChild(lenke);
+      lenke.click();
+      document.body.removeChild(lenke);
+      URL.revokeObjectURL(url);
+      
+      $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
+      setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') { // Ignorerer feil hvis brukeren trykker "Avbryt"
+      console.error(err);
+      alert("En feil oppstod under lagring: " + err.message);
+    }
+  }
 }
 
 // INNLESING AV EKSISTERENDE JSON-FIL
@@ -801,6 +920,13 @@ function lastInnFil(event) {
         $('fagFilter').value = valgtFag;
         valgteModeller = data.metadata.modeller || [];
         signaturData = data.metadata.signaturer || {};
+        
+        beskrivelseData = data.metadata.beskrivelseData || { tekst: '', bilder: [] };
+        $('beskrivelseTekst').value = beskrivelseData.tekst;
+        oppdaterBeskrivelseGalleriUI();
+        
+        oppsummeringLogg = data.metadata.oppsummeringLogg || [];
+        oppdaterOppsummeringUI();
       }
       
       if (data.kontrollData) ksData = data.kontrollData;
