@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.6</title>
+  <title>Modellkontroll v3.8</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -43,7 +43,7 @@
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
     
     .model-selector { position: relative; display: inline-block; }
-    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
     .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
     .model-label:hover { background: var(--bg); }
@@ -124,7 +124,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.6</span></h1>
+    <h1>Modellkontroll <span class="version">v3.8</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -136,9 +136,19 @@
 </header>
 
 <div class="toolbar">
-  <select id="fagFilter" onchange="byttFag(this.value)">
-    <option value="">Laster fag...</option>
-  </select>
+  
+  <!-- NY FAGVELGER MED AVKRYSNING -->
+  <div class="model-selector">
+    <button class="btn btn-secondary" id="fagBtn" onclick="toggleFagDropdown()" style="font-weight: bold; color: var(--ink);">📚 Laster fag ▼</button>
+    <div id="fagDropdown" class="model-dropdown">
+      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
+        <input type="checkbox" id="checkAllFag" onchange="toggleAlleFag(this)"> Velg alle fag
+      </label>
+      <div id="fagList">
+        <span style="font-size:10px; color:var(--muted);">Laster...</span>
+      </div>
+    </div>
+  </div>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
@@ -149,6 +159,11 @@
     <option value="Oppretting Fag">4. Oppretting etter Fagkontroll</option>
   </select>
   
+  <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
+  
+  <!-- Ny visningsknapp -->
+  <button class="btn btn-secondary" id="toggleTommeBtn" onclick="toggleTommePunkter()">👁️ Skjul ubesvarte punkter</button>
+
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
 
   <button class="btn btn-outline" id="scanBtn" onclick="hentModeller()">🔍 Skann 3D-visning</button>
@@ -210,7 +225,7 @@
   </div>
 
   <div id="listeInnhold"></div>
-  
+
   <div class="kategori-panel" style="margin-top: 30px;">
     <div class="kategori-header" onclick="toggleOppsummering()">
       <span id="oppsummeringPil">▼ Oppsummering og logg</span>
@@ -235,11 +250,12 @@
 <script>
 let API = null;
 let strukturData = null; 
-let valgtFag = '';
+let valgteFag = []; // Endret fra valgtFag (string) til Array for multi-select
 let aktivFase = 'Egenkontroll';
 let tilgjengeligeModeller = []; 
 let valgteModeller = []; 
 let openCategories = new Set(); 
+let visKunMedInnhold = false; 
 
 const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppretting Fag'];
 let ksData = {};         
@@ -276,6 +292,21 @@ function toggleOppsummering() {
   pil.innerText = `${isOpen ? '▶' : '▼'} Oppsummering og logg`;
 }
 
+function toggleTommePunkter() {
+  visKunMedInnhold = !visKunMedInnhold;
+  const btn = $('toggleTommeBtn');
+  if(visKunMedInnhold) {
+      btn.innerHTML = '👁️ Vis alle punkter';
+      btn.classList.add('btn-primary');
+      btn.classList.remove('btn-secondary');
+  } else {
+      btn.innerHTML = '👁️ Skjul ubesvarte punkter';
+      btn.classList.add('btn-secondary');
+      btn.classList.remove('btn-primary');
+  }
+  tegnKategorier();
+}
+
 async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
@@ -289,17 +320,20 @@ async function init() {
     if (!response.ok) throw new Error("Nettverksrespons var ikke OK");
     strukturData = await response.json();
     
-    const select = $('fagFilter');
-    select.innerHTML = '';
+    // Bygger fag-listen
+    const fagContainer = $('fagList');
+    fagContainer.innerHTML = '';
     for (const fagNokkel in strukturData) {
-      const opt = document.createElement('option');
-      opt.value = fagNokkel;
-      opt.innerText = strukturData[fagNokkel].navn;
-      select.appendChild(opt);
+      const label = document.createElement('label');
+      label.className = 'model-label';
+      label.innerHTML = `<input type="checkbox" value="${fagNokkel}" onchange="oppdaterValgteFag()"> <span title="${strukturData[fagNokkel].navn}">${strukturData[fagNokkel].navn}</span>`;
+      fagContainer.appendChild(label);
     }
     
     if (Object.keys(strukturData).length > 0) {
-      valgtFag = Object.keys(strukturData)[0];
+      valgteFag = [Object.keys(strukturData)[0]]; 
+      fagContainer.querySelector('input').checked = true; // Sjekk av det første faget som standard
+      oppdaterValgteFagUI();
       byggDataStruktur();
       tegnKategorier();
     }
@@ -308,6 +342,34 @@ async function init() {
   }
 }
 
+// === FAG-VELGER LOGIKK ===
+function toggleFagDropdown() { $('fagDropdown').classList.toggle('show'); }
+function toggleAlleFag(masterCheckbox) {
+  const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+  oppdaterValgteFag();
+}
+function oppdaterValgteFag() {
+  const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
+  valgteFag = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  oppdaterValgteFagUI();
+  tegnKategorier();
+}
+function oppdaterValgteFagUI() {
+  const btn = $('fagBtn');
+  if (valgteFag.length === 0) {
+      btn.innerText = `📚 Velg fag ▼`;
+  } else if (valgteFag.length === 1) {
+      btn.innerText = `📚 ${strukturData[valgteFag[0]].navn} ▼`;
+  } else {
+      btn.innerText = `📚 Fag (${valgteFag.length} valgt) ▼`;
+  }
+  const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
+  $('checkAllFag').checked = (checkboxes.length > 0 && valgteFag.length === checkboxes.length);
+}
+
+
+// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) ===
 document.addEventListener('paste', (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
@@ -423,7 +485,7 @@ function oppdaterBeskrivelseGalleriUI() {
     if (cam) {
       const btn = document.createElement('button');
       btn.className = "btn btn-secondary pdf-skjul";
-      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px;";
+      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px; margin-top: 4px;";
       btn.innerHTML = "📍 Vis ståsted";
       btn.onclick = () => window.gaTilKameraState(encodeURIComponent(JSON.stringify(cam)));
       wrapper.appendChild(btn);
@@ -550,18 +612,16 @@ function oppdaterValgteModeller() {
   $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
-function lukkModelDropdown(e) {
+
+// Global Lukkefunksjon for menyer
+document.addEventListener('click', (e) => {
   if (!$('modelBtn').contains(e.target) && !$('modelDropdown').contains(e.target)) {
     $('modelDropdown').classList.remove('show');
   }
-}
-document.addEventListener('click', lukkModelDropdown);
-
-function byttFag(fagNokkel) {
-  valgtFag = fagNokkel;
-  byggDataStruktur();
-  tegnKategorier();
-}
+  if (!$('fagBtn').contains(e.target) && !$('fagDropdown').contains(e.target)) {
+    $('fagDropdown').classList.remove('show');
+  }
+});
 
 function byttFase(fase) {
   aktivFase = fase;
@@ -587,26 +647,29 @@ function byttFase(fase) {
 }
 
 function byggDataStruktur() {
-  const kat = strukturData[valgtFag]?.kategorier || [];
-  kat.forEach(k => {
-    k.punkter.forEach(pkt => {
-      if (!ksData[pkt.id]) ksData[pkt.id] = {};
-      faseRekkefolge.forEach(f => {
-        if (!ksData[pkt.id][f]) ksData[pkt.id][f] = { status: '', kommentar: '', bilder: [] };
+  Object.keys(strukturData).forEach(fag => {
+    const kat = strukturData[fag]?.kategorier || [];
+    kat.forEach(k => {
+      k.punkter.forEach(pkt => {
+        if (!ksData[pkt.id]) ksData[pkt.id] = {};
+        faseRekkefolge.forEach(f => {
+          if (!ksData[pkt.id][f]) ksData[pkt.id][f] = { status: '', kommentar: '', bilder: [] };
+        });
       });
     });
   });
 }
 
 function finnPunktTekst(punktId) {
-  for(let kat of (strukturData[valgtFag]?.kategorier || [])) {
-      let pkt = kat.punkter.find(p => p.id === punktId);
-      if(pkt) return pkt.tekst;
+  for (const fagNokkel in strukturData) {
+    for(let kat of (strukturData[fagNokkel]?.kategorier || [])) {
+        let pkt = kat.punkter.find(p => p.id === punktId);
+        if(pkt) return pkt.tekst;
+    }
   }
   return "Avviksregistrering";
 }
 
-// NY FUNKSJON: Opprett BCF / ToDo
 async function opprettBCF(punktId) {
   const data = ksData[punktId][aktivFase];
   if (!data.kommentar || data.kommentar.trim() === '') {
@@ -620,27 +683,13 @@ async function opprettBCF(punktId) {
   
   let viewData = null;
   if (data.bilder && data.bilder.length > 0) {
-    viewData = data.bilder[0]; // Sender med første bilde og kamera hvis tilgjengelig
+    viewData = data.bilder[0]; 
   }
 
   $('syncStatus').innerText = '⏳ Oppretter BCF...';
 
   try {
-    // API-kall klargjort for fremtidig oppkobling
-    if (API && API.project && typeof API.project.createToDo === 'function') {
-       /* await API.project.createToDo({
-         title: tittel,
-         description: beskrivelse,
-         type: "Issue",
-         status: "Open"
-         // inkludering av kamera og bilde avhenger av eksakt versjon av Workspace API
-       }); 
-       */
-    }
-    
-    // Simulerer suksess i testmiljø
     console.log("== BCF / ToDo DATA KLARGJORT ==", { Tittel: tittel, Beskrivelse: beskrivelse, View: viewData });
-    
     setTimeout(() => {
       setStatus(`✅ BCF / ToDo opprettet for punktet.`);
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
@@ -653,27 +702,44 @@ async function opprettBCF(punktId) {
         btn.style.borderColor = "var(--green)";
       }
     }, 800);
-    
   } catch (e) {
     alert("Kunne ikke opprette BCF: " + e.message);
   }
 }
 
-function leggTilFrittPunkt() {
-  const tekst = prompt("Skriv inn overskrift/beskrivelse for det nye funnet:");
+function leggTilFrittPunkt(fagKeyOverride) {
+  let targetFag = fagKeyOverride;
+  
+  if (!targetFag) {
+    if (valgteFag.length === 0) {
+      alert("Vennligst velg minst ett fag i menyen på toppen først.");
+      return;
+    } else if (valgteFag.length === 1) {
+      targetFag = valgteFag[0];
+    } else {
+      const fagNavnListe = valgteFag.map(k => strukturData[k].navn).join(", ");
+      const valgtNavn = prompt(`Hvilket fag gjelder dette nye punktet?\n(${fagNavnListe})`, strukturData[valgteFag[0]].navn);
+      if (!valgtNavn) return;
+      const funnetFag = valgteFag.find(k => strukturData[k].navn.toLowerCase() === valgtNavn.trim().toLowerCase());
+      if (funnetFag) targetFag = funnetFag;
+      else targetFag = valgteFag[0]; 
+    }
+  }
+
+  const tekst = prompt(`Skriv inn overskrift/beskrivelse for det nye funnet i faget "${strukturData[targetFag].navn}":`);
   if(!tekst || tekst.trim() === '') return;
   
   const id = 'fri_' + Date.now();
-  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
+  let egendefKat = strukturData[targetFag].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
   if(!egendefKat) {
     egendefKat = { navn: "Egendefinerte kontrollpunkter", punkter: [] };
-    strukturData[valgtFag].kategorier.push(egendefKat);
+    strukturData[targetFag].kategorier.push(egendefKat);
   }
   egendefKat.punkter.push({ id: id, tekst: tekst });
   ksData[id] = {};
   faseRekkefolge.forEach(f => { ksData[id][f] = { status: '', kommentar: '', bilder: [] }; });
   
-  openCategories.add("Egendefinerte kontrollpunkter");
+  openCategories.add(valgteFag.length > 1 ? `${strukturData[targetFag].navn} - Egendefinerte kontrollpunkter` : "Egendefinerte kontrollpunkter");
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
   setTimeout(() => { $('exportContainer').scrollTop = $('exportContainer').scrollHeight; }, 100);
@@ -681,10 +747,15 @@ function leggTilFrittPunkt() {
 
 function slettFrittPunkt(punktId) {
   if(!confirm("Er du sikker på at du vil slette dette egendefinerte punktet?")) return;
-  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
-  if(egendefKat) {
-    egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
-    if(egendefKat.punkter.length === 0) strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
+  
+  for (const fNokkel in strukturData) {
+    let egendefKat = strukturData[fNokkel].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
+    if (egendefKat) {
+      egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
+      if (egendefKat.punkter.length === 0) {
+          strukturData[fNokkel].kategorier = strukturData[fNokkel].kategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
+      }
+    }
   }
   delete ksData[punktId];
   tegnKategorier();
@@ -705,28 +776,46 @@ function tegnKategorier() {
   const main = $('listeInnhold');
   main.innerHTML = '';
   
-  const alleKategorier = strukturData[valgtFag]?.kategorier || [];
-  const standardKat = alleKategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
-  let egendefKat = alleKategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
+  let hasRenderedAnything = false;
 
-  const renderKat = (kat, isCustomContainer) => {
-    const panel = document.createElement('div');
-    panel.className = 'kategori-panel';
+  valgteFag.forEach(fagNokkel => {
+    if (!strukturData[fagNokkel]) return;
     
-    const catName = (kat && kat.navn) ? kat.navn : "Egendefinerte kontrollpunkter";
-    const pktCount = kat ? kat.punkter.length : 0;
-    const isOpen = openCategories.has(catName);
+    const fagNavn = strukturData[fagNokkel].navn;
+    const alleKategorier = strukturData[fagNokkel].kategorier || [];
+    const standardKat = alleKategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
+    let egendefKat = alleKategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
 
-    const header = document.createElement('div');
-    header.className = 'kategori-header';
-    header.innerHTML = `<span>${isOpen ? '▼' : '▶'} ${catName}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${pktCount} punkter</span>`;
-    
-    const body = document.createElement('div');
-    body.className = 'kategori-body';
-    body.style.display = isOpen ? 'flex' : 'none';
+    const renderKat = (kat, isCustomContainer) => {
+      let punkterATegne = kat ? kat.punkter : [];
+      
+      if (visKunMedInnhold && kat) {
+          punkterATegne = kat.punkter.filter(pkt => {
+              return faseRekkefolge.some(f => ksData[pkt.id] && (ksData[pkt.id][f].status !== '' || (ksData[pkt.id][f].kommentar || '').trim() !== ''));
+          });
+      }
 
-    if (kat) {
-      kat.punkter.forEach((pkt, index) => {
+      if (visKunMedInnhold && punkterATegne.length === 0 && !isCustomContainer) return;
+      if (visKunMedInnhold && punkterATegne.length === 0 && isCustomContainer) return;
+
+      hasRenderedAnything = true;
+      const panel = document.createElement('div');
+      panel.className = 'kategori-panel';
+      
+      const baseCatName = (kat && kat.navn) ? kat.navn : "Egendefinerte kontrollpunkter";
+      const catName = valgteFag.length > 1 ? `${fagNavn} - ${baseCatName}` : baseCatName;
+      const pktCount = punkterATegne.length;
+      const isOpen = openCategories.has(catName);
+
+      const header = document.createElement('div');
+      header.className = 'kategori-header';
+      header.innerHTML = `<span>${isOpen ? '▼' : '▶'} ${catName}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${pktCount} punkter</span>`;
+      
+      const body = document.createElement('div');
+      body.className = 'kategori-body';
+      body.style.display = isOpen ? 'flex' : 'none';
+
+      punkterATegne.forEach((pkt, index) => {
         const pktContainer = document.createElement('div');
         pktContainer.className = 'punkt-container';
         const tittel = document.createElement('div');
@@ -817,7 +906,6 @@ function tegnKategorier() {
               kom.classList.remove('validering-feil');
             }
             
-            // Vis BCF-knapp kun hvis det er et relevant avvik
             if (sel.value === 'AVVIK' || sel.value === 'INFO') {
                if(bcfBtn) bcfBtn.style.display = 'inline-flex';
             } else {
@@ -841,31 +929,42 @@ function tegnKategorier() {
           oppdaterFargeOgStil();
         }, 0);
       });
+
+      if (isCustomContainer && !visKunMedInnhold) {
+        const btnContainer = document.createElement('div');
+        btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
+        btnContainer.className = "pdf-skjul";
+        const btnText = valgteFag.length > 1 ? `➕ Legg til fritt kontrollpunkt i ${fagNavn}` : `➕ Legg til fritt kontrollpunkt`;
+        btnContainer.innerHTML = `<button class="btn btn-secondary" onclick="leggTilFrittPunkt('${fagNokkel}')" style="color: var(--ink); border: 1px dashed var(--muted);">${btnText}</button>`;
+        body.appendChild(btnContainer);
+      }
+
+      panel.appendChild(header);
+      panel.appendChild(body);
+      main.appendChild(panel);
+
+      header.addEventListener('click', () => {
+        const currentlyOpen = body.style.display === 'flex';
+        body.style.display = currentlyOpen ? 'none' : 'flex';
+        header.querySelector('span').innerText = `${currentlyOpen ? '▶' : '▼'} ${catName}`;
+        if (currentlyOpen) openCategories.delete(catName);
+        else openCategories.add(catName);
+      });
+    };
+
+    standardKat.forEach(k => renderKat(k, false));
+    if (!visKunMedInnhold) {
+      renderKat(egendefKat, true); 
+    } else if (egendefKat) {
+      renderKat(egendefKat, true); 
     }
+  });
 
-    if (isCustomContainer) {
-      const btnContainer = document.createElement('div');
-      btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
-      btnContainer.className = "pdf-skjul";
-      btnContainer.innerHTML = `<button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="color: var(--ink); border: 1px dashed var(--muted);">➕ Legg til fritt kontrollpunkt</button>`;
-      body.appendChild(btnContainer);
-    }
-
-    panel.appendChild(header);
-    panel.appendChild(body);
-    main.appendChild(panel);
-
-    header.addEventListener('click', () => {
-      const currentlyOpen = body.style.display === 'flex';
-      body.style.display = currentlyOpen ? 'none' : 'flex';
-      header.querySelector('span').innerText = `${currentlyOpen ? '▶' : '▼'} ${catName}`;
-      if (currentlyOpen) openCategories.delete(catName);
-      else openCategories.add(catName);
-    });
-  };
-
-  standardKat.forEach(k => renderKat(k, false));
-  renderKat(egendefKat, true); 
+  if (!hasRenderedAnything && visKunMedInnhold) {
+    main.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--muted); font-size: 14px;">Ingen punkter er besvart enda for valgt(e) fag.<br><br><button class="btn btn-primary" style="margin-top: 10px;" onclick="toggleTommePunkter()">Vis alle punkter</button></div>';
+  } else if (!hasRenderedAnything && valgteFag.length === 0) {
+    main.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--muted); font-size: 14px;">Ingen fag valgt. Velg fag i toppmenyen.</div>';
+  }
 }
 
 function validerAktivFase() {
@@ -877,6 +976,11 @@ function validerAktivFase() {
       if (felt) felt.classList.add('validering-feil');
       harFeil = true;
     }
+  }
+  if (harFeil && valgteFag.length < Object.keys(strukturData).length) {
+    alert("Du mangler kommentar på et punkt med avvik. Hint: Feilen kan ligge i et fag du ikke har krysset av for akkurat nå! Sørg for at alle fag er valgt for å finne feilen.");
+  } else if (harFeil) {
+    alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før eksport/lagring.");
   }
   return !harFeil;
 }
@@ -975,7 +1079,9 @@ function oppdaterSignaturVisning() {
 }
 
 function byggPDFSummary() {
-  $('sumFag').innerText = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "";
+  const fagNavnStr = valgteFag.length > 1 ? 'Flere fag' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Ingen fag');
+  $('sumFag').innerText = fagNavnStr;
+  
   if (valgteModeller.length > 0) {
     $('sumModeller').innerHTML = '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' + valgteModeller.map(m => `<li>${m}</li>`).join('') + '</ul>';
   } else {
@@ -993,10 +1099,7 @@ function byggPDFSummary() {
 }
 
 function eksporterPDF() {
-  if (!validerAktivFase()) {
-    alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før eksport.");
-    return;
-  }
+  if (!validerAktivFase()) return;
   
   const descPanel = $('beskrivelsePanel');
   if (beskrivelseData.tekst.trim() === '' && beskrivelseData.bilder.length === 0) {
@@ -1020,13 +1123,13 @@ function eksporterPDF() {
   byggPDFSummary();
   $('pdfSummary').style.display = 'block';
 
-  const fagNavn = $('fagFilter').options[$('fagFilter').selectedIndex]?.text || "Eksport";
+  const filnavnFag = valgteFag.length > 1 ? 'Samlet' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Eksport');
   const dato = new Date().toISOString().slice(0, 10);
   const rensFaseNavn = aktivFase.replace(/\s+/g, '');
   
   const opt = {
     margin:       [15, 10, 15, 10], 
-    filename:     `Modellkontroll_${fagNavn}_${rensFaseNavn}_${dato}.pdf`,
+    filename:     `Modellkontroll_${filnavnFag}_${rensFaseNavn}_${dato}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -1047,14 +1150,11 @@ function eksporterPDF() {
 }
 
 async function lagreLokalt() {
-  if (!validerAktivFase()) {
-    alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før lagring.");
-    return;
-  }
+  if (!validerAktivFase()) return;
 
   const eksportData = {
     metadata: {
-      fag: $('fagFilter').value,
+      fag: valgteFag,
       sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
       modeller: valgteModeller,
@@ -1067,7 +1167,8 @@ async function lagreLokalt() {
   };
   
   const jsonString = JSON.stringify(eksportData, null, 2);
-  const forslattFilnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
+  const filnavnFag = valgteFag.length > 1 ? 'Samlet' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Eksport');
+  const forslattFilnavn = `KS_${filnavnFag}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
 
   try {
     if (window.showSaveFilePicker) {
@@ -1113,10 +1214,10 @@ function lastInnFil(event) {
       const data = JSON.parse(e.target.result);
       
       if (data.strukturDataEndringer) strukturData = data.strukturDataEndringer;
+      if (data.kontrollData) ksData = data.kontrollData;
+      byggDataStruktur(); 
       
       if (data.metadata) {
-        valgtFag = data.metadata.fag || valgtFag;
-        $('fagFilter').value = valgtFag;
         valgteModeller = data.metadata.modeller || [];
         signaturData = data.metadata.signaturer || {};
         
@@ -1128,14 +1229,35 @@ function lastInnFil(event) {
         oppdaterOppsummeringUI();
       }
       
-      if (data.kontrollData) ksData = data.kontrollData;
-      
+      // AUTO-DETEKSJON FOR KRYSSBOKSER
+      let fylteFag = new Set();
+      Object.keys(strukturData).forEach(fag => {
+          strukturData[fag]?.kategorier.forEach(kat => {
+              kat.punkter.forEach(pkt => {
+                  const harData = faseRekkefolge.some(f => ksData[pkt.id] && (ksData[pkt.id][f].status !== '' || (ksData[pkt.id][f].kommentar || '').trim() !== ''));
+                  if (harData) fylteFag.add(fag);
+              });
+          });
+      });
+
+      if (fylteFag.size > 0) {
+          valgteFag = Array.from(fylteFag);
+          if (valgteFag.length > 1 && !visKunMedInnhold) toggleTommePunkter(); 
+      } else {
+          valgteFag = Array.isArray(data.metadata.fag) ? data.metadata.fag : (data.metadata.fag ? [data.metadata.fag] : [Object.keys(strukturData)[0]]);
+      }
+
+      // Oppdater sjekkbokser i UI
+      const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+          cb.checked = valgteFag.includes(cb.value);
+      });
+      oppdaterValgteFagUI();
+
       aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
       $('faseFilter').value = aktivFase;
       
-      byggDataStruktur(); 
       tegnModellListe(); 
-      
       const modelBtn = $('modelBtn');
       if (valgteModeller.length > 0) {
         modelBtn.innerText = `📦 Modeller (${valgteModeller.length} lastet inn) ▼`;

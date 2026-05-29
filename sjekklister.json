@@ -36,12 +36,6 @@
     "navn": "Oppmerking",
     "kategorier": [
       {
-        "navn": "Generelle kontrollpunkter",
-        "punkter": [
-          {"id": "o_gen_1", "tekst": "Sett inn ditt første oppmerkings-punkt her"}
-        ]
-      },
-      {
         "navn": "Egenskapssett",
         "punkter": [
           {"id": "o_pset_1", "tekst": "Er riktig navn/linjetype angitt (f.eks. sperrelinje)?"},
@@ -56,6 +50,23 @@
           {"id": "o_pset_10", "tekst": "Er det påført merknader/beskrivelser og er dette riktig?"},
           {"id": "o_pset_11", "tekst": "Er riktig dimensjoner angitt?"},
           {"id": "o_pset_12", "tekst": "Henvisninger til relevante tegninger eller fagmodeller (også andre fag?)."}
+        ]
+      }
+    ]
+  },
+  "vegbommer": {
+    "navn": "Vegbommer",
+    "kategorier": [
+      {
+        "navn": "Egenskapssett",
+        "punkter": [
+          {"id": "vb_pset_1", "tekst": "Bomfundament"},
+          {"id": "vb_pset_2", "tekst": "Bommodell"},
+          {"id": "vb_pset_3", "tekst": "Lengde bomarm"},
+          {"id": "vb_pset_4", "tekst": "Leverandør"},
+          {"id": "vb_pset_5", "tekst": "Skilt_Vegbommer - Merknad"},
+          {"id": "vb_pset_6", "tekst": "Tag/ID"},
+          {"id": "vb_pset_7", "tekst": "Type bom"}
         ]
       }
     ]
