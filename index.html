@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.8</title>
+  <title>Modellkontroll v3.9</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -124,7 +124,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.8</span></h1>
+    <h1>Modellkontroll <span class="version">v3.9</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -137,7 +137,6 @@
 
 <div class="toolbar">
   
-  <!-- NY FAGVELGER MED AVKRYSNING -->
   <div class="model-selector">
     <button class="btn btn-secondary" id="fagBtn" onclick="toggleFagDropdown()" style="font-weight: bold; color: var(--ink);">📚 Laster fag ▼</button>
     <div id="fagDropdown" class="model-dropdown">
@@ -154,14 +153,14 @@
   
   <select id="faseFilter" onchange="byttFase(this.value)" style="font-weight: 600; color: var(--blue);">
     <option value="Egenkontroll">1. Egenkontroll</option>
-    <option value="Oppretting Egen">2. Oppretting etter Egenkontroll</option>
-    <option value="Fagkontroll">3. Fagkontroll</option>
-    <option value="Oppretting Fag">4. Oppretting etter Fagkontroll</option>
+    <option value="Fagkontroll">2. Fagkontroll</option>
+    <option value="Oppretting Fag">3. Oppretting etter Fagkontroll</option>
+    <option value="Tverrfaglig kontroll">4. Tverrfaglig kontroll</option>
+    <option value="Godkjent">5. Godkjent</option>
   </select>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <!-- Ny visningsknapp -->
   <button class="btn btn-secondary" id="toggleTommeBtn" onclick="toggleTommePunkter()">👁️ Skjul ubesvarte punkter</button>
 
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
@@ -224,6 +223,10 @@
     <div class="bilde-galleri" id="beskrivelseGalleri"></div>
   </div>
 
+  <div id="godkjentMessage" style="display: none; background: var(--green-dim); color: var(--green); padding: 15px; border-radius: 6px; border: 1px solid var(--green); margin-bottom: 20px; text-align: center; font-weight: bold;">
+    ✓ Dokumentet er i godkjenningsfasen. Se over historikken, fyll inn eventuelle oppsummeringer i loggen nederst, og signer dokumentet.
+  </div>
+
   <div id="listeInnhold"></div>
 
   <div class="kategori-panel" style="margin-top: 30px;">
@@ -250,14 +253,15 @@
 <script>
 let API = null;
 let strukturData = null; 
-let valgteFag = []; // Endret fra valgtFag (string) til Array for multi-select
+let valgteFag = []; 
 let aktivFase = 'Egenkontroll';
 let tilgjengeligeModeller = []; 
 let valgteModeller = []; 
 let openCategories = new Set(); 
 let visKunMedInnhold = false; 
 
-const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppretting Fag'];
+// Oppdatert fasetre!
+const faseRekkefolge = ['Egenkontroll', 'Fagkontroll', 'Oppretting Fag', 'Tverrfaglig kontroll', 'Godkjent'];
 let ksData = {};         
 let signaturData = {}; 
 
@@ -320,7 +324,6 @@ async function init() {
     if (!response.ok) throw new Error("Nettverksrespons var ikke OK");
     strukturData = await response.json();
     
-    // Bygger fag-listen
     const fagContainer = $('fagList');
     fagContainer.innerHTML = '';
     for (const fagNokkel in strukturData) {
@@ -332,7 +335,7 @@ async function init() {
     
     if (Object.keys(strukturData).length > 0) {
       valgteFag = [Object.keys(strukturData)[0]]; 
-      fagContainer.querySelector('input').checked = true; // Sjekk av det første faget som standard
+      fagContainer.querySelector('input').checked = true;
       oppdaterValgteFagUI();
       byggDataStruktur();
       tegnKategorier();
@@ -342,7 +345,6 @@ async function init() {
   }
 }
 
-// === FAG-VELGER LOGIKK ===
 function toggleFagDropdown() { $('fagDropdown').classList.toggle('show'); }
 function toggleAlleFag(masterCheckbox) {
   const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
@@ -368,8 +370,6 @@ function oppdaterValgteFagUI() {
   $('checkAllFag').checked = (checkboxes.length > 0 && valgteFag.length === checkboxes.length);
 }
 
-
-// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) ===
 document.addEventListener('paste', (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
@@ -403,7 +403,6 @@ document.addEventListener('paste', (e) => {
   
   reader.onload = async (event) => {
     const base64 = event.target.result;
-    
     let cameraState = null;
     try {
       if (API && API.viewer && typeof API.viewer.getCamera === 'function') {
@@ -613,7 +612,6 @@ function oppdaterValgteModeller() {
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
 
-// Global Lukkefunksjon for menyer
 document.addEventListener('click', (e) => {
   if (!$('modelBtn').contains(e.target) && !$('modelDropdown').contains(e.target)) {
     $('modelDropdown').classList.remove('show');
@@ -628,18 +626,25 @@ function byttFase(fase) {
   const modelBtn = $('modelBtn');
   const scanBtn = $('scanBtn');
   
-  if (aktivFase !== 'Egenkontroll') {
-    modelBtn.disabled = true;
-    scanBtn.disabled = true;
-    scanBtn.style.opacity = '0.5';
-    modelBtn.innerText = `🔒 Modeller låst (${valgteModeller.length} valgt)`;
-    modelBtn.style.opacity = '0.7';
-  } else {
+  if (aktivFase === 'Egenkontroll') {
     scanBtn.disabled = false;
     scanBtn.style.opacity = '1';
     modelBtn.disabled = false;
     modelBtn.style.opacity = '1';
     oppdaterValgteModeller(); 
+  } else {
+    modelBtn.disabled = true;
+    scanBtn.disabled = true;
+    scanBtn.style.opacity = '0.5';
+    modelBtn.innerText = `🔒 Modeller låst (${valgteModeller.length} valgt)`;
+    modelBtn.style.opacity = '0.7';
+  }
+  
+  // Vis/Skjul Godkjennings-meldingen
+  if (aktivFase === 'Godkjent') {
+      $('godkjentMessage').style.display = 'block';
+  } else {
+      $('godkjentMessage').style.display = 'none';
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
@@ -821,7 +826,7 @@ function tegnKategorier() {
         const tittel = document.createElement('div');
         tittel.className = 'punkt-tekst-tittel';
         
-        if (pkt.id.startsWith('fri_')) {
+        if (pkt.id.startsWith('fri_') && aktivFase !== 'Godkjent') {
           tittel.innerHTML = `<span>${index + 1}. ${pkt.tekst}</span> <button class="slett-btn" onclick="slettFrittPunkt('${pkt.id}')">🗑️ Slett</button>`;
         } else {
           tittel.innerText = `${index + 1}. ${pkt.tekst}`;
@@ -830,7 +835,7 @@ function tegnKategorier() {
 
         const faseIndex = faseRekkefolge.indexOf(aktivFase);
         faseRekkefolge.forEach((faseNavn, i) => {
-          if (i < faseIndex) {
+          if (i < faseIndex || aktivFase === 'Godkjent') {
             const historikkData = ksData[pkt.id][faseNavn];
             if (historikkData && historikkData.status !== '') {
               const histBlokk = document.createElement('div');
@@ -861,76 +866,87 @@ function tegnKategorier() {
           }
         });
 
-        const aktivData = ksData[pkt.id][aktivFase];
-        const aktivBlokk = document.createElement('div');
-        aktivBlokk.className = 'aktiv-fase-boks border-default';
-        aktivBlokk.id = `aktivBoks_${pkt.id}`;
-        
-        aktivBlokk.innerHTML = `
-          <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
-          <div class="input-rad">
-            <select class="status-velger" id="status_${pkt.id}">
-              <option value="">- Velg status -</option>
-              <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
-              <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
-              <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
-              <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
-            </select>
-            <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Lim gjerne inn bilder med Ctrl+V)">${aktivData.kommentar}</textarea>
-            <button class="kamera-btn pdf-skjul" onclick="taBilde('${pkt.id}')">📷 Ta 3D-Bilde</button>
-            <button class="bcf-btn pdf-skjul" id="bcfBtn_${pkt.id}" onclick="opprettBCF('${pkt.id}')" style="display:none;">💬 Opprett BCF / ToDo</button>
-          </div>
-          <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
-        `;
-        pktContainer.appendChild(aktivBlokk);
-        body.appendChild(pktContainer);
+        // Finn ut om inntasting skal vises
+        let visInntasting = true;
+        if (aktivFase === 'Godkjent') {
+            visInntasting = false;
+        } else if (aktivFase === 'Tverrfaglig kontroll' && !pkt.id.startsWith('fri_')) {
+            visInntasting = false;
+        }
 
-        setTimeout(() => {
-          oppdaterGalleriUI(pkt.id); 
-          const sel = $(`status_${pkt.id}`);
-          const kom = $(`komm_${pkt.id}`);
-          const boks = $(`aktivBoks_${pkt.id}`);
-          const bcfBtn = $(`bcfBtn_${pkt.id}`);
+        if (visInntasting) {
+          const aktivData = ksData[pkt.id][aktivFase];
+          const aktivBlokk = document.createElement('div');
+          aktivBlokk.className = 'aktiv-fase-boks border-default';
+          aktivBlokk.id = `aktivBoks_${pkt.id}`;
           
-          const oppdaterFargeOgStil = () => {
-            boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
-            if (sel.value === 'OK') boks.classList.add('border-ok');
-            else if (sel.value === 'INFO') boks.classList.add('border-info');
-            else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
-            else if (sel.value === 'IR') boks.classList.add('border-ir');
-            else boks.classList.add('border-default');
-
-            if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
-              kom.classList.add('validering-feil');
-            } else {
-              kom.classList.remove('validering-feil');
-            }
+          aktivBlokk.innerHTML = `
+            <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
+            <div class="input-rad">
+              <select class="status-velger" id="status_${pkt.id}">
+                <option value="">- Velg status -</option>
+                <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
+                <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
+                <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
+                <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
+              </select>
+              <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Lim gjerne inn bilder med Ctrl+V)">${aktivData.kommentar}</textarea>
+              <button class="kamera-btn pdf-skjul" onclick="taBilde('${pkt.id}')">📷 Ta 3D-Bilde</button>
+              <button class="bcf-btn pdf-skjul" id="bcfBtn_${pkt.id}" onclick="opprettBCF('${pkt.id}')" style="display:none;">💬 Opprett BCF / ToDo</button>
+            </div>
+            <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
+          `;
+          pktContainer.appendChild(aktivBlokk);
+          
+          setTimeout(() => {
+            oppdaterGalleriUI(pkt.id); 
+            const sel = $(`status_${pkt.id}`);
+            const kom = $(`komm_${pkt.id}`);
+            const boks = $(`aktivBoks_${pkt.id}`);
+            const bcfBtn = $(`bcfBtn_${pkt.id}`);
             
-            if (sel.value === 'AVVIK' || sel.value === 'INFO') {
-               if(bcfBtn) bcfBtn.style.display = 'inline-flex';
-            } else {
-               if(bcfBtn) bcfBtn.style.display = 'none';
-            }
+            const oppdaterFargeOgStil = () => {
+              boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
+              if (sel.value === 'OK') boks.classList.add('border-ok');
+              else if (sel.value === 'INFO') boks.classList.add('border-info');
+              else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
+              else if (sel.value === 'IR') boks.classList.add('border-ir');
+              else boks.classList.add('border-default');
 
-            sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
-          };
-          
-          sel.addEventListener('change', (e) => {
-            ksData[pkt.id][aktivFase].status = e.target.value;
+              if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
+                kom.classList.add('validering-feil');
+              } else {
+                kom.classList.remove('validering-feil');
+              }
+              
+              if (sel.value === 'AVVIK' || sel.value === 'INFO') {
+                 if(bcfBtn) bcfBtn.style.display = 'inline-flex';
+              } else {
+                 if(bcfBtn) bcfBtn.style.display = 'none';
+              }
+
+              sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
+            };
+            
+            sel.addEventListener('change', (e) => {
+              ksData[pkt.id][aktivFase].status = e.target.value;
+              oppdaterFargeOgStil();
+              $('syncStatus').innerText = '🟠 Ulagrede endringer';
+            });
+            
+            kom.addEventListener('input', (e) => {
+              ksData[pkt.id][aktivFase].kommentar = e.target.value;
+              oppdaterFargeOgStil();
+              $('syncStatus').innerText = '🟠 Ulagrede endringer';
+            });
             oppdaterFargeOgStil();
-            $('syncStatus').innerText = '🟠 Ulagrede endringer';
-          });
-          
-          kom.addEventListener('input', (e) => {
-            ksData[pkt.id][aktivFase].kommentar = e.target.value;
-            oppdaterFargeOgStil();
-            $('syncStatus').innerText = '🟠 Ulagrede endringer';
-          });
-          oppdaterFargeOgStil();
-        }, 0);
+          }, 0);
+        }
+        
+        body.appendChild(pktContainer);
       });
 
-      if (isCustomContainer && !visKunMedInnhold) {
+      if (isCustomContainer && !visKunMedInnhold && aktivFase !== 'Godkjent') {
         const btnContainer = document.createElement('div');
         btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
         btnContainer.className = "pdf-skjul";
@@ -968,8 +984,13 @@ function tegnKategorier() {
 }
 
 function validerAktivFase() {
+  if (aktivFase === 'Godkjent') return true; // Ingen validering av standard-felt nødvendig
+
   let harFeil = false;
   for (const id in ksData) {
+    // I tverrfaglig validerer vi kun de frie punktene
+    if (aktivFase === 'Tverrfaglig kontroll' && !id.startsWith('fri_')) continue;
+
     const data = ksData[id][aktivFase];
     if (data && (data.status === 'AVVIK' || data.status === 'INFO') && data.kommentar.trim() === '') {
       const felt = $(`komm_${id}`);
@@ -1030,9 +1051,9 @@ function oppdaterGalleriUI(punktId) {
     
     const img = document.createElement('img');
     img.src = src;
-    img.title = "Klikk for å fjerne bilde";
+    img.title = aktivFase !== 'Godkjent' ? "Klikk for å fjerne bilde" : "";
     img.onclick = () => {
-      if(confirm("Vil du slette dette bildet?")) {
+      if(aktivFase !== 'Godkjent' && confirm("Vil du slette dette bildet?")) {
         ksData[punktId][aktivFase].bilder.splice(imgIndex, 1);
         oppdaterGalleriUI(punktId);
         $('syncStatus').innerText = '🟠 Ulagrede endringer';
@@ -1229,7 +1250,6 @@ function lastInnFil(event) {
         oppdaterOppsummeringUI();
       }
       
-      // AUTO-DETEKSJON FOR KRYSSBOKSER
       let fylteFag = new Set();
       Object.keys(strukturData).forEach(fag => {
           strukturData[fag]?.kategorier.forEach(kat => {
@@ -1247,11 +1267,8 @@ function lastInnFil(event) {
           valgteFag = Array.isArray(data.metadata.fag) ? data.metadata.fag : (data.metadata.fag ? [data.metadata.fag] : [Object.keys(strukturData)[0]]);
       }
 
-      // Oppdater sjekkbokser i UI
       const checkboxes = $('fagList').querySelectorAll('input[type="checkbox"]');
-      checkboxes.forEach(cb => {
-          cb.checked = valgteFag.includes(cb.value);
-      });
+      checkboxes.forEach(cb => { cb.checked = valgteFag.includes(cb.value); });
       oppdaterValgteFagUI();
 
       aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
