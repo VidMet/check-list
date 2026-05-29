@@ -40,6 +40,23 @@
         "punkter": [
           {"id": "o_gen_1", "tekst": "Sett inn ditt første oppmerkings-punkt her"}
         ]
+      },
+      {
+        "navn": "Egenskapssett",
+        "punkter": [
+          {"id": "o_pset_1", "tekst": "Er riktig navn/linjetype angitt (f.eks. sperrelinje)?"},
+          {"id": "o_pset_2", "tekst": "Er riktig navn/linjetype angitt (f.eks. 1004)?"},
+          {"id": "o_pset_3", "tekst": "Er riktig utlegginsmetode korrekt angitt (f.eks. manuell/maskinell)?"},
+          {"id": "o_pset_4", "tekst": "Er riktig materiale angitt (f.eks. termoplast/maling)?"},
+          {"id": "o_pset_5", "tekst": "Er riktig fresetype angitt?"},
+          {"id": "o_pset_6", "tekst": "Er riktig farge for veioppmerkingen angitt?"},
+          {"id": "o_pset_7", "tekst": "Er riktig posisjonsnummer angitt for alle linjer/merking?"},
+          {"id": "o_pset_8", "tekst": "Er riktig objektkode angitt og i tråd med gjeldene objektkodeliste?"},
+          {"id": "o_pset_9", "tekst": "Er riktig objektnavn angitt og i tråd med gjeldene objektkodeliste?"},
+          {"id": "o_pset_10", "tekst": "Er det påført merknader/beskrivelser og er dette riktig?"},
+          {"id": "o_pset_11", "tekst": "Er riktig dimensjoner angitt?"},
+          {"id": "o_pset_12", "tekst": "Henvisninger til relevante tegninger eller fagmodeller (også andre fag?)."}
+        ]
       }
     ]
   }
