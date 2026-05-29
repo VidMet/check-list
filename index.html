@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.2</title>
+  <title>Modellkontroll v3.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -116,7 +116,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.2</span></h1>
+    <h1>Modellkontroll <span class="version">v3.3</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -244,7 +244,6 @@ const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
 
-// Lyttere for Beskrivelse
 $('beskrivelseTekst').addEventListener('input', (e) => {
   beskrivelseData.tekst = e.target.value;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
@@ -290,7 +289,6 @@ async function init() {
   }
 }
 
-// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V for skjermbilder) ===
 document.addEventListener('paste', (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
@@ -710,7 +708,6 @@ function tegnKategorier() {
       });
     }
 
-    // Unik knapp for egendefinerte punkter
     if (isCustomContainer) {
       const btnContainer = document.createElement('div');
       btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
@@ -733,7 +730,7 @@ function tegnKategorier() {
   };
 
   standardKat.forEach(k => renderKat(k, false));
-  renderKat(egendefKat, true); // Renderer alltid en lukkbar mappe for frie punkter til slutt
+  renderKat(egendefKat, true); 
 }
 
 function validerAktivFase() {
@@ -913,39 +910,21 @@ async function lagreLokalt() {
   const forslattFilnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
 
   try {
-    if (window.showSaveFilePicker) {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: forslattFilnavn,
-        types: [{
-          description: 'JSON Prosjektfil',
-          accept: {'application/json': ['.json']}
-        }]
-      });
-      const writable = await handle.createWritable();
-      await writable.write(jsonString);
-      await writable.close();
-      
-      $('syncStatus').innerText = `🟢 Lagret (${aktivFase})`;
-      setStatus(`✅ Filen ble lagret til ønsket plassering.`);
-    } else {
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const lenke = document.createElement("a");
-      lenke.href = url;
-      lenke.download = forslattFilnavn;
-      document.body.appendChild(lenke);
-      lenke.click();
-      document.body.removeChild(lenke);
-      URL.revokeObjectURL(url);
-      
-      $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
-      setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
-    }
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const lenke = document.createElement("a");
+    lenke.href = url;
+    lenke.download = forslattFilnavn;
+    document.body.appendChild(lenke);
+    lenke.click();
+    document.body.removeChild(lenke);
+    URL.revokeObjectURL(url);
+    
+    $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
+    setStatus(`✅ Filen ble lastet ned. (Sjekk nedlastingsmappen din)`);
   } catch (err) {
-    if (err.name !== 'AbortError') { 
-      console.error(err);
-      alert("En feil oppstod under lagring: " + err.message);
-    }
+    console.error(err);
+    alert("En feil oppstod under lagring: " + err.message);
   }
 }
 
