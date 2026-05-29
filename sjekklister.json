@@ -11,12 +11,34 @@
           {"id": "v_gen_4", "tekst": "Tverrfall og resulterende fall"},
           {"id": "v_gen_5", "tekst": "Breddeutvidelser"},
           {"id": "v_gen_6", "tekst": "Sikt"},
-          {"id": "v_gen_5", "tekst": "Overbygning"},
-          {"id": "v_gen_5", "tekst": "Grøfteutforming"},
-          {"id": "v_gen_5", "tekst": "Sikkert sideterreng/rekkverk"},
-          {"id": "v_gen_5", "tekst": "Kontroll mot reguleringsplan"},
-          {"id": "v_gen_5", "tekst": "Kontroll mot ortofoto, innmålinger etc."},
-          {"id": "v_gen_5", "tekst": "Egenskapsdata"}
+          {"id": "v_gen_7", "tekst": "Overbygning"},
+          {"id": "v_gen_8", "tekst": "Grøfteutforming"},
+          {"id": "v_gen_9", "tekst": "Sikkert sideterreng/rekkverk"},
+          {"id": "v_gen_10", "tekst": "Kontroll mot reguleringsplan"},
+          {"id": "v_gen_11", "tekst": "Kontroll mot ortofoto, innmålinger etc."},
+          {"id": "v_gen_12", "tekst": "Egenskapsdata"}
+        ]
+      }
+    ]
+  },
+  "skilt": {
+    "navn": "Skilt",
+    "kategorier": [
+      {
+        "navn": "Generelle kontrollpunkter",
+        "punkter": [
+          {"id": "s_gen_1", "tekst": "Sett inn ditt første skilt-punkt her"}
+        ]
+      }
+    ]
+  },
+  "oppmerking": {
+    "navn": "Oppmerking",
+    "kategorier": [
+      {
+        "navn": "Generelle kontrollpunkter",
+        "punkter": [
+          {"id": "o_gen_1", "tekst": "Sett inn ditt første oppmerkings-punkt her"}
         ]
       }
     ]

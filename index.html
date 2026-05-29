@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.3</title>
+  <title>Modellkontroll v3.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -31,7 +31,7 @@
     .toolbar select, .toolbar input, .btn { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
     .toolbar input { cursor: text; }
     
-    .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; }
+    .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; border: 1px solid var(--border); }
     .btn:hover:not(:disabled) { background: var(--border); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--blue); color: white; border: none; }
@@ -116,7 +116,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.3</span></h1>
+    <h1>Modellkontroll <span class="version">v3.4</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -162,11 +162,11 @@
     <label for="brukerInitialer">Signatur:</label>
     <input type="text" id="brukerInitialer" placeholder="F.eks. OLA" style="width:75px; text-transform: uppercase;">
   </div>
-  <button class="btn" id="signerBtn" onclick="signerFase()">✍️ Signer aktiv fase</button>
+  <button class="btn btn-secondary" id="signerBtn" onclick="signerFase()">✍️ Signer aktiv fase</button>
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <button class="btn" onclick="eksporterPDF()">📄 Eksporter til PDF</button>
+  <button class="btn btn-secondary" onclick="eksporterPDF()">📄 Eksporter til PDF</button>
 </div>
 
 <div id="signaturInfo"></div>
@@ -202,6 +202,10 @@
   </div>
 
   <div id="listeInnhold"></div>
+  
+  <div style="margin-top: 20px; text-align: center;" class="pdf-skjul">
+    <button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="border: 1px dashed var(--muted); color: var(--muted);">➕ Legg til fritt kontrollpunkt</button>
+  </div>
 
   <div class="kategori-panel" style="margin-top: 30px;">
     <div class="kategori-header" onclick="toggleOppsummering()">
@@ -243,6 +247,18 @@ let oppsummeringLogg = [];
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
+
+// Gjenopprett kamera globalt for historikk-visningen
+window.gaTilKameraState = async function(camStr) {
+  try {
+    const cam = JSON.parse(decodeURIComponent(camStr));
+    if (API && API.viewer && typeof API.viewer.setCamera === 'function') {
+      await API.viewer.setCamera(cam);
+    } else {
+      alert("Kan ikke flytte kamera: Trimble API er ikke tilgjengelig.");
+    }
+  } catch(e) { console.error("Feil ved kameraposisjonering", e); }
+};
 
 $('beskrivelseTekst').addEventListener('input', (e) => {
   beskrivelseData.tekst = e.target.value;
@@ -289,7 +305,8 @@ async function init() {
   }
 }
 
-document.addEventListener('paste', (e) => {
+// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) + KAMERA ===
+document.addEventListener('paste', async (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
   
@@ -317,19 +334,28 @@ document.addEventListener('paste', (e) => {
 
   e.preventDefault();
   
+  // Hent kamera hvis vi er i Trimble
+  let cameraState = null;
+  try {
+    if (API && API.viewer && typeof API.viewer.getCamera === 'function') {
+      cameraState = await API.viewer.getCamera();
+    }
+  } catch(err) { console.warn("Kunne ikke fange kamera ved Ctrl+V", err); }
+  
   const blob = imageItem.getAsFile();
   const reader = new FileReader();
   
   reader.onload = (event) => {
     const base64 = event.target.result;
+    const imgData = { src: base64, camera: cameraState };
     
     if (isBeskrivelse) {
-      beskrivelseData.bilder.push(base64);
+      beskrivelseData.bilder.push(imgData);
       oppdaterBeskrivelseGalleriUI();
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
       setStatus('📋 Manuelt skjermbilde limt inn i generell beskrivelse.');
     } else if (targetPunktId) {
-      ksData[targetPunktId][aktivFase].bilder.push(base64);
+      ksData[targetPunktId][aktivFase].bilder.push(imgData);
       oppdaterGalleriUI(targetPunktId);
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
       setStatus(`📋 Manuelt skjermbilde limt inn under ${aktivFase}.`);
@@ -341,10 +367,18 @@ document.addEventListener('paste', (e) => {
 async function taBildeBeskrivelse() {
   try {
     let base64;
+    let cameraState = null;
+    
     if (API && API.viewer) {
+      // Hent Bilde
       const methods = [API.viewer.getSnapshot, API.viewer.getScreenshot, API.viewer.captureScreenshot];
       for (let m of methods) { if (typeof m === 'function') { base64 = await m.bind(API.viewer)(); break; } }
       if(!base64) throw new Error("Ingen metoder funnet.");
+      
+      // Hent Kamera
+      if (typeof API.viewer.getCamera === 'function') {
+        cameraState = await API.viewer.getCamera();
+      }
     } else {
       const canvas = document.createElement('canvas');
       canvas.width = 300; canvas.height = 150;
@@ -355,7 +389,7 @@ async function taBildeBeskrivelse() {
       base64 = canvas.toDataURL();
     }
     
-    beskrivelseData.bilder.push(base64);
+    beskrivelseData.bilder.push({ src: base64, camera: cameraState });
     oppdaterBeskrivelseGalleriUI();
     $('syncStatus').innerText = '🟠 Ulagrede endringer';
   } catch (e) {
@@ -366,9 +400,15 @@ async function taBildeBeskrivelse() {
 function oppdaterBeskrivelseGalleriUI() {
   const galleri = $('beskrivelseGalleri');
   galleri.innerHTML = '';
-  beskrivelseData.bilder.forEach((b64, imgIndex) => {
+  beskrivelseData.bilder.forEach((imgObj, imgIndex) => {
+    const src = imgObj.src || imgObj;
+    const cam = imgObj.camera;
+    
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = "display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 150px;";
+    
     const img = document.createElement('img');
-    img.src = b64;
+    img.src = src;
     img.title = "Klikk for å fjerne bilde";
     img.onclick = () => {
       if(confirm("Vil du slette dette bildet fra beskrivelsen?")) {
@@ -377,7 +417,18 @@ function oppdaterBeskrivelseGalleriUI() {
         $('syncStatus').innerText = '🟠 Ulagrede endringer';
       }
     };
-    galleri.appendChild(img);
+    wrapper.appendChild(img);
+    
+    if (cam) {
+      const btn = document.createElement('button');
+      btn.className = "btn btn-secondary pdf-skjul";
+      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px;";
+      btn.innerHTML = "📍 Vis ståsted";
+      btn.onclick = () => window.gaTilKameraState(encodeURIComponent(JSON.stringify(cam)));
+      wrapper.appendChild(btn);
+    }
+    
+    galleri.appendChild(wrapper);
   });
 }
 
@@ -634,11 +685,23 @@ function tegnKategorier() {
               const histBlokk = document.createElement('div');
               histBlokk.className = 'historikk-blokk';
               const format = getStatusFormat(historikkData.status);
+              
               let html = `<div class="historikk-header"><span>Fase: ${faseNavn}</span><span class="historikk-status ${format.css}">${format.tekst}</span></div>`;
               if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
+              
               if (historikkData.bilder && historikkData.bilder.length > 0) {
                 html += `<div class="bilde-galleri" style="margin-top:8px;">`;
-                historikkData.bilder.forEach(b64 => { html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`; });
+                historikkData.bilder.forEach(imgObj => { 
+                  const src = imgObj.src || imgObj;
+                  const cam = imgObj.camera;
+                  html += `<div style="display:inline-flex; flex-direction:column; gap:4px; max-width:150px;">
+                             <img src="${src}" onclick="window.open('${src}', '_blank')">`;
+                  if (cam) {
+                    const camStr = encodeURIComponent(JSON.stringify(cam));
+                    html += `<button class="btn btn-secondary pdf-skjul" style="font-size:9px; padding:3px;" onclick="window.gaTilKameraState('${camStr}')">📍 Vis ståsted</button>`;
+                  }
+                  html += `</div>`;
+                });
                 html += `</div>`;
               }
               histBlokk.innerHTML = html;
@@ -662,8 +725,8 @@ function tegnKategorier() {
               <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
               <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
             </select>
-            <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Du kan også lime inn skjermbilder her med Ctrl+V)">${aktivData.kommentar}</textarea>
-            <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 3D-Bilde</button>
+            <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Lim gjerne inn bilder med Ctrl+V)">${aktivData.kommentar}</textarea>
+            <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 Ta 3D-Bilde</button>
           </div>
           <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
         `;
@@ -746,13 +809,20 @@ function validerAktivFase() {
   return !harFeil;
 }
 
+// === BILDE-LOGIKK FOR PUNKT MED KAMERA ===
 async function taBilde(punktId) {
   try {
     let base64;
+    let cameraState = null;
+    
     if (API && API.viewer) {
       const methods = [API.viewer.getSnapshot, API.viewer.getScreenshot, API.viewer.captureScreenshot];
       for (let m of methods) { if (typeof m === 'function') { base64 = await m.bind(API.viewer)(); break; } }
       if(!base64) throw new Error("Ingen metoder funnet.");
+      
+      if (typeof API.viewer.getCamera === 'function') {
+        cameraState = await API.viewer.getCamera();
+      }
     } else {
       const canvas = document.createElement('canvas');
       canvas.width = 300; canvas.height = 150;
@@ -762,7 +832,8 @@ async function taBilde(punktId) {
       ctx.fillText(`Snap: ${new Date().toLocaleTimeString()}`, 90, 80);
       base64 = canvas.toDataURL();
     }
-    ksData[punktId][aktivFase].bilder.push(base64);
+    
+    ksData[punktId][aktivFase].bilder.push({ src: base64, camera: cameraState });
     oppdaterGalleriUI(punktId);
     $('syncStatus').innerText = '🟠 Ulagrede endringer';
     setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
@@ -773,10 +844,17 @@ function oppdaterGalleriUI(punktId) {
   const galleri = $(`galleri_${punktId}`);
   if(!galleri) return;
   galleri.innerHTML = '';
+  
   const bilder = ksData[punktId][aktivFase].bilder || [];
-  bilder.forEach((b64, imgIndex) => {
+  bilder.forEach((imgObj, imgIndex) => {
+    const src = imgObj.src || imgObj;
+    const cam = imgObj.camera;
+    
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = "display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 150px;";
+    
     const img = document.createElement('img');
-    img.src = b64;
+    img.src = src;
     img.title = "Klikk for å fjerne bilde";
     img.onclick = () => {
       if(confirm("Vil du slette dette bildet?")) {
@@ -785,7 +863,18 @@ function oppdaterGalleriUI(punktId) {
         $('syncStatus').innerText = '🟠 Ulagrede endringer';
       }
     };
-    galleri.appendChild(img);
+    wrapper.appendChild(img);
+    
+    if (cam) {
+      const btn = document.createElement('button');
+      btn.className = "btn btn-secondary pdf-skjul";
+      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px;";
+      btn.innerHTML = "📍 Vis ståsted";
+      btn.onclick = () => window.gaTilKameraState(encodeURIComponent(JSON.stringify(cam)));
+      wrapper.appendChild(btn);
+    }
+    
+    galleri.appendChild(wrapper);
   });
 }
 
@@ -910,21 +999,36 @@ async function lagreLokalt() {
   const forslattFilnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
 
   try {
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const lenke = document.createElement("a");
-    lenke.href = url;
-    lenke.download = forslattFilnavn;
-    document.body.appendChild(lenke);
-    lenke.click();
-    document.body.removeChild(lenke);
-    URL.revokeObjectURL(url);
-    
-    $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
-    setStatus(`✅ Filen ble lastet ned. (Sjekk nedlastingsmappen din)`);
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: forslattFilnavn,
+        types: [{ description: 'JSON Prosjektfil', accept: {'application/json': ['.json']} }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(jsonString);
+      await writable.close();
+      
+      $('syncStatus').innerText = `🟢 Lagret (${aktivFase})`;
+      setStatus(`✅ Filen ble lagret til ønsket plassering.`);
+    } else {
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const lenke = document.createElement("a");
+      lenke.href = url;
+      lenke.download = forslattFilnavn;
+      document.body.appendChild(lenke);
+      lenke.click();
+      document.body.removeChild(lenke);
+      URL.revokeObjectURL(url);
+      
+      $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
+      setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
+    }
   } catch (err) {
-    console.error(err);
-    alert("En feil oppstod under lagring: " + err.message);
+    if (err.name !== 'AbortError') { 
+      console.error(err);
+      alert("En feil oppstod under lagring: " + err.message);
+    }
   }
 }
 
