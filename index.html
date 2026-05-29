@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.1</title>
+  <title>Modellkontroll v3.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -116,7 +116,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.1</span></h1>
+    <h1>Modellkontroll <span class="version">v3.2</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -193,26 +193,15 @@
     </div>
   </div>
 
-  <div class="kategori-panel" id="beskrivelsePanel">
-    <div class="kategori-header" onclick="toggleBeskrivelse()">
-      <span id="beskrivelsePil">▼ Generell beskrivelse av kontrollen</span>
+  <div id="beskrivelsePanel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+    <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Generell beskrivelse av kontrollen... (Tips: Du kan lime inn skjermbilder direkte her med Ctrl+V)"></textarea>
+    <div class="pdf-skjul">
+      <button class="kamera-btn" onclick="taBildeBeskrivelse()" style="display: inline-flex;">📷 Legg til 3D-bilde i beskrivelsen</button>
     </div>
-    <div class="kategori-body" id="beskrivelseKropp" style="display: flex; padding: 14px; gap: 10px; flex-direction: column;">
-      <div class="input-rad">
-        <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Skriv beskrivelse... (Tips: Du kan lime inn skjermbilder direkte her med Ctrl+V)"></textarea>
-      </div>
-      <div class="input-rad pdf-skjul">
-        <button class="kamera-btn" onclick="taBildeBeskrivelse()">📷 Legg til 3D-bilde i beskrivelsen</button>
-      </div>
-      <div class="bilde-galleri" id="beskrivelseGalleri"></div>
-    </div>
+    <div class="bilde-galleri" id="beskrivelseGalleri"></div>
   </div>
 
   <div id="listeInnhold"></div>
-  
-  <div style="margin-top: 20px; text-align: center;" class="pdf-skjul">
-    <button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="border: 1px dashed var(--muted); color: var(--muted);">➕ Legg til fritt kontrollpunkt</button>
-  </div>
 
   <div class="kategori-panel" style="margin-top: 30px;">
     <div class="kategori-header" onclick="toggleOppsummering()">
@@ -242,6 +231,7 @@ let valgtFag = '';
 let aktivFase = 'Egenkontroll';
 let tilgjengeligeModeller = []; 
 let valgteModeller = []; 
+let openCategories = new Set(); 
 
 const faseRekkefolge = ['Egenkontroll', 'Oppretting Egen', 'Fagkontroll', 'Oppretting Fag'];
 let ksData = {};         
@@ -259,14 +249,6 @@ $('beskrivelseTekst').addEventListener('input', (e) => {
   beskrivelseData.tekst = e.target.value;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 });
-
-function toggleBeskrivelse() {
-  const kropp = $('beskrivelseKropp');
-  const pil = $('beskrivelsePil');
-  const isOpen = kropp.style.display !== 'none';
-  kropp.style.display = isOpen ? 'none' : 'flex';
-  pil.innerText = `${isOpen ? '▶' : '▼'} Generell beskrivelse av kontrollen`;
-}
 
 function toggleOppsummering() {
   const kropp = $('oppsummeringKropp');
@@ -320,7 +302,6 @@ document.addEventListener('paste', (e) => {
     }
   }
   
-  // Hvis det ikke var et bilde som ble limt inn, la nettleseren gjøre som normalt (lime inn tekst)
   if (!imageItem) return;
 
   const activeEl = document.activeElement;
@@ -336,7 +317,6 @@ document.addEventListener('paste', (e) => {
     return;
   }
 
-  // Hindre bildet i å limes inn som "tekst"
   e.preventDefault();
   
   const blob = imageItem.getAsFile();
@@ -357,11 +337,9 @@ document.addEventListener('paste', (e) => {
       setStatus(`📋 Manuelt skjermbilde limt inn under ${aktivFase}.`);
     }
   };
-  
   reader.readAsDataURL(blob);
 });
 
-// === BILDE-LOGIKK FOR BESKRIVELSE ===
 async function taBildeBeskrivelse() {
   try {
     let base64;
@@ -417,12 +395,7 @@ function leggTilLogg() {
   
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   
-  oppsummeringLogg.push({
-    fase: aktivFase,
-    initialer: init,
-    dato: dato,
-    tekst: tekst
-  });
+  oppsummeringLogg.push({ fase: aktivFase, initialer: init, dato: dato, tekst: tekst });
   
   $('nyOppsummeringTekst').value = '';
   oppdaterOppsummeringUI();
@@ -589,6 +562,7 @@ function leggTilFrittPunkt() {
   ksData[id] = {};
   faseRekkefolge.forEach(f => { ksData[id][f] = { status: '', kommentar: '', bilder: [] }; });
   
+  openCategories.add("Egendefinerte punkter");
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
   setTimeout(() => { $('exportContainer').scrollTop = $('exportContainer').scrollHeight; }, 100);
@@ -619,123 +593,147 @@ function getStatusFormat(kode) {
 function tegnKategorier() {
   const main = $('listeInnhold');
   main.innerHTML = '';
-  const kategorier = strukturData[valgtFag]?.kategorier || [];
+  
+  const alleKategorier = strukturData[valgtFag]?.kategorier || [];
+  const standardKat = alleKategorier.filter(k => k.navn !== "Egendefinerte punkter");
+  let egendefKat = alleKategorier.find(k => k.navn === "Egendefinerte punkter");
 
-  kategorier.forEach(kat => {
+  const renderKat = (kat, isCustomContainer) => {
     const panel = document.createElement('div');
     panel.className = 'kategori-panel';
     
+    const catName = kat ? kat.navn : "Egendefinerte punkter";
+    const pktCount = kat ? kat.punkter.length : 0;
+    const isOpen = openCategories.has(catName);
+
     const header = document.createElement('div');
     header.className = 'kategori-header';
-    header.innerHTML = `<span>▶ ${kat.navn}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${kat.punkter.length} punkter</span>`;
+    header.innerHTML = `<span>${isOpen ? '▼' : '▶'} ${catName}</span> <span style="font-family:var(--mono); color:var(--muted); font-size:11px;">${pktCount} punkter</span>`;
     
     const body = document.createElement('div');
     body.className = 'kategori-body';
+    body.style.display = isOpen ? 'flex' : 'none';
 
-    kat.punkter.forEach((pkt, index) => {
-      const pktContainer = document.createElement('div');
-      pktContainer.className = 'punkt-container';
-      const tittel = document.createElement('div');
-      tittel.className = 'punkt-tekst-tittel';
-      
-      if (pkt.id.startsWith('fri_')) {
-        tittel.innerHTML = `<span>${index + 1}. ${pkt.tekst}</span> <button class="slett-btn" onclick="slettFrittPunkt('${pkt.id}')">🗑️ Slett</button>`;
-      } else {
-        tittel.innerText = `${index + 1}. ${pkt.tekst}`;
-      }
-      pktContainer.appendChild(tittel);
-
-      const faseIndex = faseRekkefolge.indexOf(aktivFase);
-      faseRekkefolge.forEach((faseNavn, i) => {
-        if (i < faseIndex) {
-          const historikkData = ksData[pkt.id][faseNavn];
-          if (historikkData && historikkData.status !== '') {
-            const histBlokk = document.createElement('div');
-            histBlokk.className = 'historikk-blokk';
-            const format = getStatusFormat(historikkData.status);
-            let html = `<div class="historikk-header"><span>Fase: ${faseNavn}</span><span class="historikk-status ${format.css}">${format.tekst}</span></div>`;
-            if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
-            if (historikkData.bilder && historikkData.bilder.length > 0) {
-              html += `<div class="bilde-galleri" style="margin-top:8px;">`;
-              historikkData.bilder.forEach(b64 => { html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`; });
-              html += `</div>`;
-            }
-            histBlokk.innerHTML = html;
-            pktContainer.appendChild(histBlokk);
-          }
+    if (kat) {
+      kat.punkter.forEach((pkt, index) => {
+        const pktContainer = document.createElement('div');
+        pktContainer.className = 'punkt-container';
+        const tittel = document.createElement('div');
+        tittel.className = 'punkt-tekst-tittel';
+        
+        if (pkt.id.startsWith('fri_')) {
+          tittel.innerHTML = `<span>${index + 1}. ${pkt.tekst}</span> <button class="slett-btn" onclick="slettFrittPunkt('${pkt.id}')">🗑️ Slett</button>`;
+        } else {
+          tittel.innerText = `${index + 1}. ${pkt.tekst}`;
         }
-      });
+        pktContainer.appendChild(tittel);
 
-      const aktivData = ksData[pkt.id][aktivFase];
-      const aktivBlokk = document.createElement('div');
-      aktivBlokk.className = 'aktiv-fase-boks border-default';
-      aktivBlokk.id = `aktivBoks_${pkt.id}`;
-      
-      aktivBlokk.innerHTML = `
-        <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
-        <div class="input-rad">
-          <select class="status-velger" id="status_${pkt.id}">
-            <option value="">- Velg status -</option>
-            <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
-            <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
-            <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
-            <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
-          </select>
-          <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Du kan også lime inn skjermbilder her med Ctrl+V)">${aktivData.kommentar}</textarea>
-          <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 3D-Bilde</button>
-        </div>
-        <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
-      `;
-      pktContainer.appendChild(aktivBlokk);
-      body.appendChild(pktContainer);
-
-      setTimeout(() => {
-        oppdaterGalleriUI(pkt.id); 
-        const sel = $(`status_${pkt.id}`);
-        const kom = $(`komm_${pkt.id}`);
-        const boks = $(`aktivBoks_${pkt.id}`);
-        
-        const oppdaterFargeOgStil = () => {
-          boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
-          if (sel.value === 'OK') boks.classList.add('border-ok');
-          else if (sel.value === 'INFO') boks.classList.add('border-info');
-          else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
-          else if (sel.value === 'IR') boks.classList.add('border-ir');
-          else boks.classList.add('border-default');
-
-          if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
-            kom.classList.add('validering-feil');
-          } else {
-            kom.classList.remove('validering-feil');
+        const faseIndex = faseRekkefolge.indexOf(aktivFase);
+        faseRekkefolge.forEach((faseNavn, i) => {
+          if (i < faseIndex) {
+            const historikkData = ksData[pkt.id][faseNavn];
+            if (historikkData && historikkData.status !== '') {
+              const histBlokk = document.createElement('div');
+              histBlokk.className = 'historikk-blokk';
+              const format = getStatusFormat(historikkData.status);
+              let html = `<div class="historikk-header"><span>Fase: ${faseNavn}</span><span class="historikk-status ${format.css}">${format.tekst}</span></div>`;
+              if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
+              if (historikkData.bilder && historikkData.bilder.length > 0) {
+                html += `<div class="bilde-galleri" style="margin-top:8px;">`;
+                historikkData.bilder.forEach(b64 => { html += `<img src="${b64}" onclick="window.open('${b64}', '_blank')">`; });
+                html += `</div>`;
+              }
+              histBlokk.innerHTML = html;
+              pktContainer.appendChild(histBlokk);
+            }
           }
-          sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
-        };
-        
-        sel.addEventListener('change', (e) => {
-          ksData[pkt.id][aktivFase].status = e.target.value;
-          oppdaterFargeOgStil();
-          $('syncStatus').innerText = '🟠 Ulagrede endringer';
         });
+
+        const aktivData = ksData[pkt.id][aktivFase];
+        const aktivBlokk = document.createElement('div');
+        aktivBlokk.className = 'aktiv-fase-boks border-default';
+        aktivBlokk.id = `aktivBoks_${pkt.id}`;
         
-        kom.addEventListener('input', (e) => {
-          ksData[pkt.id][aktivFase].kommentar = e.target.value;
+        aktivBlokk.innerHTML = `
+          <div class="fase-tittel">Redigerer nå: ${aktivFase}</div>
+          <div class="input-rad">
+            <select class="status-velger" id="status_${pkt.id}">
+              <option value="">- Velg status -</option>
+              <option value="OK" ${aktivData.status === 'OK' ? 'selected' : ''}>Ingen avvik, OK</option>
+              <option value="INFO" ${aktivData.status === 'INFO' ? 'selected' : ''}>Ingen avvik, forbedringsforslag</option>
+              <option value="AVVIK" ${aktivData.status === 'AVVIK' ? 'selected' : ''}>Avvik funnet, må rettes</option>
+              <option value="IR" ${aktivData.status === 'IR' ? 'selected' : ''}>Ikke relevant</option>
+            </select>
+            <textarea class="punkt-kommentar" id="komm_${pkt.id}" placeholder="Skriv kommentar... (Du kan også lime inn skjermbilder her med Ctrl+V)">${aktivData.kommentar}</textarea>
+            <button class="kamera-btn" onclick="taBilde('${pkt.id}')">📷 3D-Bilde</button>
+          </div>
+          <div class="bilde-galleri" id="galleri_${pkt.id}"></div>
+        `;
+        pktContainer.appendChild(aktivBlokk);
+        body.appendChild(pktContainer);
+
+        setTimeout(() => {
+          oppdaterGalleriUI(pkt.id); 
+          const sel = $(`status_${pkt.id}`);
+          const kom = $(`komm_${pkt.id}`);
+          const boks = $(`aktivBoks_${pkt.id}`);
+          
+          const oppdaterFargeOgStil = () => {
+            boks.classList.remove('border-default', 'border-ok', 'border-info', 'border-avvik', 'border-ir');
+            if (sel.value === 'OK') boks.classList.add('border-ok');
+            else if (sel.value === 'INFO') boks.classList.add('border-info');
+            else if (sel.value === 'AVVIK') boks.classList.add('border-avvik');
+            else if (sel.value === 'IR') boks.classList.add('border-ir');
+            else boks.classList.add('border-default');
+
+            if ((sel.value === 'AVVIK' || sel.value === 'INFO') && kom.value.trim() === '') {
+              kom.classList.add('validering-feil');
+            } else {
+              kom.classList.remove('validering-feil');
+            }
+            sel.style.backgroundColor = getStatusFormat(sel.value).fargeValg;
+          };
+          
+          sel.addEventListener('change', (e) => {
+            ksData[pkt.id][aktivFase].status = e.target.value;
+            oppdaterFargeOgStil();
+            $('syncStatus').innerText = '🟠 Ulagrede endringer';
+          });
+          
+          kom.addEventListener('input', (e) => {
+            ksData[pkt.id][aktivFase].kommentar = e.target.value;
+            oppdaterFargeOgStil();
+            $('syncStatus').innerText = '🟠 Ulagrede endringer';
+          });
           oppdaterFargeOgStil();
-          $('syncStatus').innerText = '🟠 Ulagrede endringer';
-        });
-        oppdaterFargeOgStil();
-      }, 0);
-    });
+        }, 0);
+      });
+    }
+
+    // Unik knapp for egendefinerte punkter
+    if (isCustomContainer) {
+      const btnContainer = document.createElement('div');
+      btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
+      btnContainer.className = "pdf-skjul";
+      btnContainer.innerHTML = `<button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="color: var(--ink); border: 1px dashed var(--muted);">➕ Legg til fritt kontrollpunkt</button>`;
+      body.appendChild(btnContainer);
+    }
 
     panel.appendChild(header);
     panel.appendChild(body);
     main.appendChild(panel);
 
     header.addEventListener('click', () => {
-      const isOpen = body.style.display === 'flex';
-      body.style.display = isOpen ? 'none' : 'flex';
-      header.querySelector('span').innerText = `${isOpen ? '▶' : '▼'} ${kat.navn}`;
+      const currentlyOpen = body.style.display === 'flex';
+      body.style.display = currentlyOpen ? 'none' : 'flex';
+      header.querySelector('span').innerText = `${currentlyOpen ? '▶' : '▼'} ${catName}`;
+      if (currentlyOpen) openCategories.delete(catName);
+      else openCategories.add(catName);
     });
-  });
+  };
+
+  standardKat.forEach(k => renderKat(k, false));
+  renderKat(egendefKat, true); // Renderer alltid en lukkbar mappe for frie punkter til slutt
 }
 
 function validerAktivFase() {
@@ -842,14 +840,17 @@ function eksporterPDF() {
     alert("Du mangler kommentar på noen punkter med avvik. Fyll ut røde felt før eksport.");
     return;
   }
+  
+  const descPanel = $('beskrivelsePanel');
+  if (beskrivelseData.tekst.trim() === '' && beskrivelseData.bilder.length === 0) {
+    descPanel.classList.add('hide-empty');
+  }
 
-  $('beskrivelseKropp').style.display = 'flex';
-  $('beskrivelsePil').innerText = '▼ Generell beskrivelse av kontrollen';
   $('oppsummeringKropp').style.display = 'flex';
   $('oppsummeringPil').innerText = '▼ Oppsummering og logg';
   
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
-  document.querySelectorAll('.kategori-header span:first-child').forEach(el => { el.innerText = el.innerText.replace('▶', '▼'); });
+  document.querySelectorAll('.kategori-header span:first-child').forEach(el => { el.innerText = '▼'; });
 
   const container = $('exportContainer');
   container.classList.add('pdf-mode');
@@ -878,6 +879,7 @@ function eksporterPDF() {
   
   html2pdf().set(opt).from(container).save().then(() => {
     container.classList.remove('pdf-mode');
+    descPanel.classList.remove('hide-empty');
     $('pdfSummary').style.display = 'none';
     document.querySelectorAll('.punkt-kommentar').forEach(txt => {
       txt.classList.remove('hide-empty');
