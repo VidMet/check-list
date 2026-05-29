@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.9</title>
+  <title>Modellkontroll v4.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -43,10 +43,11 @@
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
     
     .model-selector { position: relative; display: inline-block; }
-    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 320px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
-    .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
+    .model-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-family: var(--mono); padding: 4px; border-radius: 4px; border-bottom: 1px solid var(--bg); }
     .model-label:hover { background: var(--bg); }
+    .rev-input { width: 45px; font-size: 10px; font-family: var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; text-align: center; }
     
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -58,6 +59,11 @@
     .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
     .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
     .summary-table th { background: var(--surface2); font-weight: bold; }
+    
+    .model-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--sans); }
+    .model-summary-table th, .model-summary-table td { border: 1px solid var(--border); padding: 6px; text-align: center; }
+    .model-summary-table th { background: var(--surface2); font-weight: bold; }
+    .model-summary-table td:first-child, .model-summary-table th:first-child { text-align: left; font-family: var(--mono); }
     
     .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
@@ -124,8 +130,8 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.9</span></h1>
-    <p>Sporing av avvik og utbedring i BIM</p>
+    <h1>Modellkontroll <span class="version">v4.0</span></h1>
+    <p>Sporing av avvik og versjonskontroll i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
     <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
@@ -140,7 +146,7 @@
   <div class="model-selector">
     <button class="btn btn-secondary" id="fagBtn" onclick="toggleFagDropdown()" style="font-weight: bold; color: var(--ink);">📚 Laster fag ▼</button>
     <div id="fagDropdown" class="model-dropdown">
-      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
+      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px; justify-content: flex-start;">
         <input type="checkbox" id="checkAllFag" onchange="toggleAlleFag(this)"> Velg alle fag
       </label>
       <div id="fagList">
@@ -169,7 +175,7 @@
   <div class="model-selector">
     <button class="btn" id="modelBtn" onclick="toggleModelDropdown()" disabled>📦 Skann modeller først ▼</button>
     <div id="modelDropdown" class="model-dropdown">
-      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px;">
+      <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px; justify-content: flex-start;">
         <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visningen
       </label>
       <div id="modelList">
@@ -209,9 +215,9 @@
       </thead>
       <tbody id="sumSignaturer"></tbody>
     </table>
-    <div style="font-size: 12px;">
-      <strong>Kontrollerte modeller i 3D-visning:</strong><br>
-      <div id="sumModeller" style="color: var(--ink); font-family: var(--sans);"></div>
+    <div style="margin-top: 20px;">
+      <strong>Modellversjoner per fase:</strong><br><br>
+      <div id="sumModeller"></div>
     </div>
   </div>
 
@@ -260,13 +266,13 @@ let valgteModeller = [];
 let openCategories = new Set(); 
 let visKunMedInnhold = false; 
 
-// Oppdatert fasetre!
 const faseRekkefolge = ['Egenkontroll', 'Fagkontroll', 'Oppretting Fag', 'Tverrfaglig kontroll', 'Godkjent'];
 let ksData = {};         
 let signaturData = {}; 
 
 let beskrivelseData = { tekst: '', bilder: [] };
 let oppsummeringLogg = [];
+let modellHistorikk = {}; // NYTT: Lagrer versjonskoder per modell og fase
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
@@ -329,6 +335,7 @@ async function init() {
     for (const fagNokkel in strukturData) {
       const label = document.createElement('label');
       label.className = 'model-label';
+      label.style.justifyContent = 'flex-start';
       label.innerHTML = `<input type="checkbox" value="${fagNokkel}" onchange="oppdaterValgteFag()"> <span title="${strukturData[fagNokkel].navn}">${strukturData[fagNokkel].navn}</span>`;
       fagContainer.appendChild(label);
     }
@@ -590,11 +597,23 @@ function tegnModellListe() {
     return;
   }
   const modellerÅVise = tilgjengeligeModeller.length > 0 ? tilgjengeligeModeller.map(m=>m.name) : valgteModeller;
+  
   modellerÅVise.forEach(mName => {
     const isChecked = valgteModeller.includes(mName) ? 'checked' : '';
+    const safeId = encodeURIComponent(mName).replace(/[^a-zA-Z0-9]/g, '_');
+    
+    // Henter lagret versjon for modellen i aktiv fase (hvis den finnes)
+    const defaultRev = (modellHistorikk[mName] && modellHistorikk[mName][aktivFase]) ? modellHistorikk[mName][aktivFase] : '';
+
     const label = document.createElement('label');
     label.className = 'model-label';
-    label.innerHTML = `<input type="checkbox" value="${mName}" onchange="oppdaterValgteModeller()" ${isChecked}> <span title="${mName}">${mName}</span>`;
+    label.innerHTML = `
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" value="${mName}" onchange="oppdaterValgteModeller()" ${isChecked}>
+        <span title="${mName}">${mName}</span>
+      </div>
+      <input type="text" id="rev_${safeId}" class="rev-input" value="${defaultRev}" placeholder="Rev" onchange="oppdaterValgteModeller()">
+    `;
     container.appendChild(label);
   });
 }
@@ -605,9 +624,24 @@ function toggleAlleModeller(masterCheckbox) {
   checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
   oppdaterValgteModeller();
 }
+
+// Oppdatert for å også lagre versjonskoder
 function oppdaterValgteModeller() {
-  const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
-  valgteModeller = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  valgteModeller = [];
+  const labels = $('modelList').querySelectorAll('.model-label');
+  
+  labels.forEach(lbl => {
+      const cb = lbl.querySelector('input[type="checkbox"]');
+      const revInput = lbl.querySelector('input[type="text"]');
+      const mName = cb.value;
+      
+      if(cb.checked) {
+          valgteModeller.push(mName);
+          if (!modellHistorikk[mName]) modellHistorikk[mName] = {};
+          modellHistorikk[mName][aktivFase] = revInput.value.trim();
+      }
+  });
+
   $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
@@ -631,16 +665,14 @@ function byttFase(fase) {
     scanBtn.style.opacity = '1';
     modelBtn.disabled = false;
     modelBtn.style.opacity = '1';
-    oppdaterValgteModeller(); 
   } else {
-    modelBtn.disabled = true;
+    // Lar dem velge modeller også i andre faser for å oppdatere revisjon
     scanBtn.disabled = true;
     scanBtn.style.opacity = '0.5';
-    modelBtn.innerText = `🔒 Modeller låst (${valgteModeller.length} valgt)`;
-    modelBtn.style.opacity = '0.7';
+    modelBtn.disabled = false;
+    modelBtn.style.opacity = '1';
   }
   
-  // Vis/Skjul Godkjennings-meldingen
   if (aktivFase === 'Godkjent') {
       $('godkjentMessage').style.display = 'block';
   } else {
@@ -648,6 +680,8 @@ function byttFase(fase) {
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
+  tegnModellListe(); // Oppdaterer input-boksene med riktig revisjon for den nye fasen
+  oppdaterValgteModeller();
   tegnKategorier(); 
 }
 
@@ -866,7 +900,6 @@ function tegnKategorier() {
           }
         });
 
-        // Finn ut om inntasting skal vises
         let visInntasting = true;
         if (aktivFase === 'Godkjent') {
             visInntasting = false;
@@ -984,11 +1017,10 @@ function tegnKategorier() {
 }
 
 function validerAktivFase() {
-  if (aktivFase === 'Godkjent') return true; // Ingen validering av standard-felt nødvendig
+  if (aktivFase === 'Godkjent') return true; 
 
   let harFeil = false;
   for (const id in ksData) {
-    // I tverrfaglig validerer vi kun de frie punktene
     if (aktivFase === 'Tverrfaglig kontroll' && !id.startsWith('fri_')) continue;
 
     const data = ksData[id][aktivFase];
@@ -1077,6 +1109,9 @@ function oppdaterGalleriUI(punktId) {
 function signerFase() {
   const initialer = $('brukerInitialer').value.trim();
   if (!initialer) { alert("Vennligst skriv inn initialene dine i signatur-feltet øverst."); return; }
+  
+  oppdaterValgteModeller(); // Sikre at vi fanger opp eventuelle siste endringer i versjonskoder
+  
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   signaturData[aktivFase] = { initialer: initialer, dato: dato };
   oppdaterSignaturVisning();
@@ -1103,11 +1138,28 @@ function byggPDFSummary() {
   const fagNavnStr = valgteFag.length > 1 ? 'Flere fag' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Ingen fag');
   $('sumFag').innerText = fagNavnStr;
   
-  if (valgteModeller.length > 0) {
-    $('sumModeller').innerHTML = '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' + valgteModeller.map(m => `<li>${m}</li>`).join('') + '</ul>';
+  // Bygger versjonstabellen
+  let modelHtml = '<table class="model-summary-table"><thead><tr><th>Modellfil</th>';
+  faseRekkefolge.forEach(f => modelHtml += `<th>${f}</th>`);
+  modelHtml += '</tr></thead><tbody>';
+
+  if (Object.keys(modellHistorikk).length > 0) {
+     Object.keys(modellHistorikk).forEach(mName => {
+         const hist = modellHistorikk[mName];
+         if (Object.keys(hist).length > 0) {
+             modelHtml += `<tr><td>${mName}</td>`;
+             faseRekkefolge.forEach(f => {
+                 modelHtml += `<td>${hist[f] || '-'}</td>`;
+             });
+             modelHtml += `</tr>`;
+         }
+     });
   } else {
-    $('sumModeller').innerHTML = '<i>Ingen spesifikke modeller avkrysset</i>';
+     modelHtml += `<tr><td colspan="${faseRekkefolge.length + 1}" style="text-align:center; color:var(--muted); font-size:12px; padding:10px;">Ingen modeller registrert</td></tr>`;
   }
+  modelHtml += '</tbody></table>';
+  $('sumModeller').innerHTML = modelHtml;
+  
   const tbody = $('sumSignaturer');
   tbody.innerHTML = '';
   faseRekkefolge.forEach(fase => {
@@ -1121,6 +1173,7 @@ function byggPDFSummary() {
 
 function eksporterPDF() {
   if (!validerAktivFase()) return;
+  oppdaterValgteModeller(); // Sikre at vi får med oss tabellrevisjoner
   
   const descPanel = $('beskrivelsePanel');
   if (beskrivelseData.tekst.trim() === '' && beskrivelseData.bilder.length === 0) {
@@ -1172,6 +1225,7 @@ function eksporterPDF() {
 
 async function lagreLokalt() {
   if (!validerAktivFase()) return;
+  oppdaterValgteModeller(); // Sikre at tabellrevisjoner blir med i fila
 
   const eksportData = {
     metadata: {
@@ -1179,6 +1233,7 @@ async function lagreLokalt() {
       sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
       modeller: valgteModeller,
+      modellHistorikk: modellHistorikk, // NY
       signaturer: signaturData,
       beskrivelseData: beskrivelseData,
       oppsummeringLogg: oppsummeringLogg
@@ -1240,6 +1295,7 @@ function lastInnFil(event) {
       
       if (data.metadata) {
         valgteModeller = data.metadata.modeller || [];
+        modellHistorikk = data.metadata.modellHistorikk || {}; // NY
         signaturData = data.metadata.signaturer || {};
         
         beskrivelseData = data.metadata.beskrivelseData || { tekst: '', bilder: [] };
@@ -1274,7 +1330,9 @@ function lastInnFil(event) {
       aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
       $('faseFilter').value = aktivFase;
       
-      tegnModellListe(); 
+      // Vi tegner modellen så vi får med versjonsdata
+      tilgjengeligeModeller = valgteModeller.map(m => ({name: m}));
+      
       const modelBtn = $('modelBtn');
       if (valgteModeller.length > 0) {
         modelBtn.innerText = `📦 Modeller (${valgteModeller.length} lastet inn) ▼`;
