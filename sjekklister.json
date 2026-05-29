@@ -5,137 +5,18 @@
       {
         "navn": "Generelle kontrollpunkter",
         "punkter": [
-          {"id": "v_gen_1", "tekst": "Er alle styrende dokumenter blitt identifisert (relevante håndbøker, konkurransegrunnlaget, kommunale normer, reguleringsplankart, reguleringsplanbestemmelser, tunnelsikkerhetsforskriften osv.)?"},
-          {"id": "v_gen_2", "tekst": "Er alle krav i konkurransegrunnlaget gjennomgått ogivaretatt ved prosjektering?"},
-          {"id": "v_gen_3", "tekst": "Har plassering av veganlegget blitt sjekket i forhold tilreguleringsplan?"},
-          {"id": "v_gen_4", "tekst": "Har reguleringsplanbestemmelser blitt sjekket?"},
-          {"id": "v_gen_5", "tekst": "Er alle relevante foreliggende fravikssøknader identifisert?"}
-        ]
-      },
-      {
-        "navn": "Dimensjoneringsklasse og normalprofil",
-        "punkter": [
-          {"id": "v_dim_1", "tekst": "Kjørefeltbredde og skulderbredde er iht. valgt dimensjoneringsklasse."}
-        ]
-      },
-      {
-        "navn": "Ramper og fartsendringsfelt",
-        "punkter": [
-          {"id": "v_ram_1", "tekst": "Lengde på akselerasjons-/retardasjonsfelt er iht. N100."}
-        ]
-      },
-      {
-        "navn": "Linjeføring og kurvatur",
-        "punkter": [
-          {"id": "v_lin_1", "tekst": "Kombinasjon av horisontal- og vertikalkurvatur gir god visuell føring."},
-          {"id": "v_lin_2", "tekst": "Tverrfall og overhøyde i kurver er prosjektert riktig."}
-        ]
-      },
-      {
-        "navn": "Tunnel",
-        "punkter": [
-          {"id": "v_tun_1", "tekst": "Påkrevd fritt rom i tunnelprofil er ivaretatt."}
-        ]
-      },
-      {
-        "navn": "Sikt",
-        "punkter": [
-          {"id": "v_sik_1", "tekst": "Stoppsikt og møtesikt er kontrollert mot terreng og rekkverk."}
-        ]
-      },
-      {
-        "navn": "Frihøyde",
-        "punkter": [
-          {"id": "v_fri_1", "tekst": "Nødvendig frihøyde under portaler og bruer er ivaretatt."}
-        ]
-      },
-      {
-        "navn": "Plankryss og avkjørsel",
-        "punkter": [
-          {"id": "v_pla_1", "tekst": "Frisikttrekanter i kryss er frie for hindringer."}
-        ]
-      },
-      {
-        "navn": "Rundkjøring",
-        "punkter": [
-          {"id": "v_run_1", "tekst": "Kjøretøykurver for dimensjonerende kjøretøy er kontrollert."}
-        ]
-      },
-      {
-        "navn": "Sikkerhetssone",
-        "punkter": [
-          {"id": "v_sikk_1", "tekst": "Sikkerhetssonen er fri for farlige sidehinder."}
-        ]
-      },
-      {
-        "navn": "Rekkverk",
-        "punkter": [
-          {"id": "v_rek_1", "tekst": "Arbeidsbredde for rekkverk er hensyntatt mot bakforliggende hinder."}
-        ]
-      },
-      {
-        "navn": "Støy og støyskjerm",
-        "punkter": [
-          {"id": "v_sto_1", "tekst": "Støyskjerm er plassert uten konflikt med sikt og snøbrøyting."}
-        ]
-      },
-      {
-        "navn": "Bussholdeplass",
-        "punkter": [
-          {"id": "v_bus_1", "tekst": "Utforming tillater universell utforming (UU) for påstigning."}
-        ]
-      },
-      {
-        "navn": "Gang- og sykkelanlegg",
-        "punkter": [
-          {"id": "v_gsa_1", "tekst": "Tilstrekkelig separering fra kjørebane er ivaretatt."}
-        ]
-      },
-      {
-        "navn": "Gangfelt",
-        "punkter": [
-          {"id": "v_gan_1", "tekst": "Taktil oppmerking/indikatorer er lagt inn i modellen."}
-        ]
-      },
-      {
-        "navn": "Bru",
-        "punkter": [
-          {"id": "v_bru_1", "tekst": "Overgang mellom veg og brukonstruksjon er koordinert."}
-        ]
-      },
-      {
-        "navn": "Beplantning",
-        "punkter": [
-          {"id": "v_bep_1", "tekst": "Vegetasjon er ikke i konflikt med siktlinjer."}
-        ]
-      },
-      {
-        "navn": "Drenering, flom og grunnvann",
-        "punkter": [
-          {"id": "v_dre_1", "tekst": "Avrenning fra overflate føres til lukkede anlegg eller grøft."}
-        ]
-      },
-      {
-        "navn": "Belysning",
-        "punkter": [
-          {"id": "v_bel_1", "tekst": "Lysmaster er plassert utenfor sikkerhetssone eller energiabsorberende."}
-        ]
-      },
-      {
-        "navn": "Drift og vedlikehold",
-        "punkter": [
-          {"id": "v_drv_1", "tekst": "Arealer for snøopplag er avsatt der det er påkrevd."}
-        ]
-      }
-    ]
-  },
-  "rekkverk": {
-    "navn": "Vegutstyr rekkverk",
-    "kategorier": [
-      {
-        "navn": "Generelle krav N101",
-        "punkter": [
-          {"id": "r_gen_1", "tekst": "Rekkverkstype er i henhold til styrkeklasse og arbeidsbredde."}
+          {"id": "v_gen_1", "tekst": "Normalprofil, vegbredde og skulderbredde"},
+          {"id": "v_gen_2", "tekst": "Horisontalgeometri"},
+          {"id": "v_gen_3", "tekst": "Vertikalgeometri"},
+          {"id": "v_gen_4", "tekst": "Tverrfall og resulterende fall"},
+          {"id": "v_gen_5", "tekst": "Breddeutvidelser"},
+          {"id": "v_gen_6", "tekst": "Sikt"},
+          {"id": "v_gen_5", "tekst": "Overbygning"},
+          {"id": "v_gen_5", "tekst": "Grøfteutforming"},
+          {"id": "v_gen_5", "tekst": "Sikkert sideterreng/rekkverk"},
+          {"id": "v_gen_5", "tekst": "Kontroll mot reguleringsplan"},
+          {"id": "v_gen_5", "tekst": "Kontroll mot ortofoto, innmålinger etc."},
+          {"id": "v_gen_5", "tekst": "Egenskapsdata"}
         ]
       }
     ]
