@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.1</title>
+  <title>Modellkontroll v4.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -43,10 +43,11 @@
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
     
     .model-selector { position: relative; display: inline-block; }
-    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 320px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
-    .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
+    .model-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-family: var(--mono); padding: 4px; border-radius: 4px; border-bottom: 1px solid var(--bg); }
     .model-label:hover { background: var(--bg); }
+    .rev-input { width: 45px; font-size: 10px; font-family: var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; text-align: center; }
     
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -59,7 +60,6 @@
     .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
     .summary-table th { background: var(--surface2); font-weight: bold; }
     
-    /* Ny tabell for modellversjoner */
     .model-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--sans); }
     .model-summary-table th, .model-summary-table td { border: 1px solid var(--border); padding: 6px; text-align: center; }
     .model-summary-table th { background: var(--surface2); font-weight: bold; }
@@ -114,6 +114,7 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
+    /* PDF Styling */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     .pdf-mode .aktiv-fase-boks { border: 1px solid var(--border) !important; background: var(--surface) !important; display: block; padding: 12px; }
@@ -124,14 +125,17 @@
     .pdf-mode .punkt-kommentar { display: block; width: 100%; padding: 0 !important; margin-bottom: 8px; border: none !important; background: transparent !important; font-style: normal; }
     .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; }
     .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; }
+    
+    /* Deltakertabell styling for PDF */
+    .pdf-mode #deltakerTabellBody input[type="text"] { border: none; background: transparent; padding: 0; outline: none; color: var(--ink); font-family: var(--sans); }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.1</span></h1>
-    <p>Sporing av avvik og automatisk versjonskontroll</p>
+    <h1>Modellkontroll <span class="version">v4.2</span></h1>
+    <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
     <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
@@ -220,6 +224,26 @@
       <div id="sumModeller"></div>
     </div>
   </div>
+  
+  <!-- Nytt Deltaker-panel (Kun for Tverrfaglig kontroll) -->
+  <div class="kategori-panel" id="deltakerPanel" style="display: none; margin-bottom: 20px;">
+     <div class="kategori-header"><span>▼ Møtedeltakere (Tverrfaglig kontroll)</span></div>
+     <div class="kategori-body" style="display: flex; padding: 14px; flex-direction: column; gap: 8px;">
+         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+             <thead>
+                 <tr style="border-bottom: 1px solid var(--border);">
+                     <th style="text-align:left; padding-bottom: 6px;">Navn</th>
+                     <th style="text-align:left; padding-bottom: 6px;">Fag</th>
+                     <th style="text-align:center; padding-bottom: 6px; width: 60px;">Til stede</th>
+                     <th style="text-align:center; padding-bottom: 6px; width: 60px;">Kopi</th>
+                     <th style="width: 40px;" class="pdf-skjul"></th>
+                 </tr>
+             </thead>
+             <tbody id="deltakerTabellBody"></tbody>
+         </table>
+         <button class="btn btn-secondary pdf-skjul" onclick="leggTilDeltaker()" style="align-self: flex-start; margin-top: 8px;">➕ Legg til person</button>
+     </div>
+  </div>
 
   <div id="beskrivelsePanel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
     <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Generell beskrivelse av kontrollen... (Tips: Du kan lime inn skjermbilder direkte her med Ctrl+V)"></textarea>
@@ -273,12 +297,16 @@ let signaturData = {};
 let beskrivelseData = { tekst: '', bilder: [] };
 let oppsummeringLogg = [];
 let modellHistorikk = {}; 
-let gjeldendeVersjoner = {}; // Lagrer usynlig UUID/Hash per modell fra siste scan
+let gjeldendeVersjoner = {}; 
+
+// Tverrfaglig deltakere
+let deltakere = []; 
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
 
+// Kamera-støtte
 window.gaTilKameraState = async function(camStr) {
   try {
     const cam = JSON.parse(decodeURIComponent(camStr));
@@ -290,11 +318,13 @@ window.gaTilKameraState = async function(camStr) {
   } catch(e) { console.error("Feil ved kameraposisjonering", e); }
 };
 
+// Lyttere for Beskrivelse
 $('beskrivelseTekst').addEventListener('input', (e) => {
   beskrivelseData.tekst = e.target.value;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 });
 
+// UI toggles
 function toggleOppsummering() {
   const kropp = $('oppsummeringKropp');
   const pil = $('oppsummeringPil');
@@ -352,6 +382,38 @@ async function init() {
     setStatus('❌ Kunne ikke laste sjekklister.json.');
   }
 }
+
+// === DELTAKER-TABELL LOGIKK ===
+function tegnDeltakere() {
+    const tbody = $('deltakerTabellBody');
+    tbody.innerHTML = '';
+    deltakere.forEach((d, i) => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid var(--surface2)";
+        tr.innerHTML = `
+            <td style="padding: 4px 0;"><input type="text" value="${d.navn}" onchange="oppdaterDeltaker(${i}, 'navn', this.value)" style="width:100%; border:none; background:transparent; font-family:var(--sans); font-size:11px;" placeholder="Navn..."></td>
+            <td style="padding: 4px 0;"><input type="text" value="${d.fag}" onchange="oppdaterDeltaker(${i}, 'fag', this.value)" style="width:100%; border:none; background:transparent; font-family:var(--sans); font-size:11px;" placeholder="Fagområde..."></td>
+            <td style="text-align:center; padding: 4px 0;"><input type="checkbox" ${d.tilStede ? 'checked' : ''} onchange="oppdaterDeltaker(${i}, 'tilStede', this.checked)"></td>
+            <td style="text-align:center; padding: 4px 0;"><input type="checkbox" ${d.kopi ? 'checked' : ''} onchange="oppdaterDeltaker(${i}, 'kopi', this.checked)"></td>
+            <td style="text-align:center; padding: 4px 0;" class="pdf-skjul"><button class="slett-btn" onclick="slettDeltaker(${i})">X</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+window.leggTilDeltaker = function() {
+    deltakere.push({navn: '', fag: '', tilStede: false, kopi: false});
+    tegnDeltakere();
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+};
+window.oppdaterDeltaker = function(index, felt, verdi) {
+    deltakere[index][felt] = verdi;
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+};
+window.slettDeltaker = function(index) {
+    deltakere.splice(index, 1);
+    tegnDeltakere();
+    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+};
 
 function toggleFagDropdown() { $('fagDropdown').classList.toggle('show'); }
 function toggleAlleFag(masterCheckbox) {
@@ -544,7 +606,6 @@ function oppdaterOppsummeringUI() {
   });
 }
 
-// === AUTOMATISK SYSTEM-VERSJONS-SCAN ===
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
@@ -583,7 +644,7 @@ async function hentModeller() {
       }).filter(m => m.antallObjekter > 0); 
       
       tilgjengeligeModeller = gyldigeModeller.map(m => {
-          gjeldendeVersjoner[m.name] = m.versionId; // Lagrer den usynlige IDen
+          gjeldendeVersjoner[m.name] = m.versionId; 
           return { id: m.id, name: m.name };
       });
       
@@ -647,7 +708,6 @@ function oppdaterValgteModeller() {
           valgteModeller.push(mName);
           if (!modellHistorikk[mName]) modellHistorikk[mName] = {};
           
-          // Hvis vi nettopp har scannet, bruker vi fersk ID. Hvis ikke, beholder vi det som lå i JSON
           if (gjeldendeVersjoner[mName]) {
               modellHistorikk[mName][aktivFase] = gjeldendeVersjoner[mName];
           } else if (!modellHistorikk[mName][aktivFase]) {
@@ -690,6 +750,13 @@ function byttFase(fase) {
       $('godkjentMessage').style.display = 'block';
   } else {
       $('godkjentMessage').style.display = 'none';
+  }
+  
+  // Tverrfaglig visning logic for the deltaker tabell
+  if (aktivFase === 'Tverrfaglig kontroll') {
+      $('deltakerPanel').style.display = 'block';
+  } else {
+      $('deltakerPanel').style.display = 'none';
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
@@ -741,9 +808,12 @@ async function opprettBCF(punktId) {
   $('syncStatus').innerText = '⏳ Oppretter BCF...';
 
   try {
-    console.log("== BCF / ToDo DATA KLARGJORT ==", { Tittel: tittel, Beskrivelse: beskrivelse, View: viewData });
+    // Dette er en "Mock" / Placeholder-funksjon. 
+    // Faktisk opprettelse av BCF-topics krever et eget API token via REST API, 
+    // som ikke støttes out-of-the-box av standard Workspace Extension API her.
+    console.log("== BCF / ToDo DATA KLARGJORT (Simulering) ==", { Tittel: tittel, Beskrivelse: beskrivelse, View: viewData });
     setTimeout(() => {
-      setStatus(`✅ BCF / ToDo opprettet for punktet.`);
+      setStatus(`✅ BCF / ToDo simulert for punktet.`);
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
       
       const btn = $(`bcfBtn_${punktId}`);
@@ -848,7 +918,7 @@ function tegnKategorier() {
       }
 
       if (visKunMedInnhold && punkterATegne.length === 0 && !isCustomContainer) return;
-      if (visKunMedInnhold && punkterATegne.length === 0 && isCustomContainer) return;
+      if (visKunMedInnhold && punkterATegne.length === 0 && isCustomContainer && aktivFase !== 'Tverrfaglig kontroll') return;
 
       hasRenderedAnything = true;
       const panel = document.createElement('div');
@@ -992,7 +1062,9 @@ function tegnKategorier() {
         body.appendChild(pktContainer);
       });
 
-      if (isCustomContainer && !visKunMedInnhold && aktivFase !== 'Godkjent') {
+      const showAddBtn = isCustomContainer && aktivFase !== 'Godkjent' && (!visKunMedInnhold || aktivFase === 'Tverrfaglig kontroll');
+      
+      if (showAddBtn) {
         const btnContainer = document.createElement('div');
         btnContainer.style = "padding: 14px; text-align: center; border-top: 1px dashed var(--border);";
         btnContainer.className = "pdf-skjul";
@@ -1014,10 +1086,16 @@ function tegnKategorier() {
       });
     };
 
-    standardKat.forEach(k => renderKat(k, false));
-    if (!visKunMedInnhold) {
+    // Vise standardlister HVIS ikke tverrfaglig
+    if (aktivFase !== 'Tverrfaglig kontroll') {
+        standardKat.forEach(k => renderKat(k, false));
+    }
+    
+    // Vise egendefinerte (alltid aktuelt å inkludere under Tverrfaglig)
+    if (!visKunMedInnhold || (visKunMedInnhold && egendefKat)) {
       renderKat(egendefKat, true); 
-    } else if (egendefKat) {
+    } else if (aktivFase === 'Tverrfaglig kontroll') {
+      // Sørg for at den dukker opp under Tverrfaglig selv om filteret er på og mappa er tom
       renderKat(egendefKat, true); 
     }
   });
@@ -1210,6 +1288,15 @@ function eksporterPDF() {
   document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
   document.querySelectorAll('.kategori-header span:first-child').forEach(el => { el.innerText = '▼'; });
 
+  // Lås Deltaker-tabell inputs før utskrift
+  document.querySelectorAll('#deltakerTabellBody input[type="text"]').forEach(input => {
+      input.setAttribute('value', input.value);
+  });
+  document.querySelectorAll('#deltakerTabellBody input[type="checkbox"]').forEach(input => {
+      if(input.checked) input.setAttribute('checked', 'checked');
+      else input.removeAttribute('checked');
+  });
+
   const container = $('exportContainer');
   container.classList.add('pdf-mode');
   
@@ -1260,7 +1347,8 @@ async function lagreLokalt() {
       modellHistorikk: modellHistorikk,
       signaturer: signaturData,
       beskrivelseData: beskrivelseData,
-      oppsummeringLogg: oppsummeringLogg
+      oppsummeringLogg: oppsummeringLogg,
+      deltakere: deltakere // NYTT for Tverrfaglig
     },
     kontrollData: ksData,
     strukturDataEndringer: strukturData 
@@ -1328,6 +1416,9 @@ function lastInnFil(event) {
         
         oppsummeringLogg = data.metadata.oppsummeringLogg || [];
         oppdaterOppsummeringUI();
+        
+        deltakere = data.metadata.deltakere || [];
+        tegnDeltakere();
       }
       
       let fylteFag = new Set();
