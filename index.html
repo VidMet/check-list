@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v3.4</title>
+  <title>Modellkontroll v3.5</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -70,7 +70,7 @@
     .slett-btn { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 3px 6px; font-size: 10px; font-family: var(--mono); cursor: pointer; opacity: 0.7; transition: 0.2s; }
     .slett-btn:hover { opacity: 1; background: var(--red); color: white; }
 
-    .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; margin-bottom: 4px; }
+    .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; margin-bottom: 4px; page-break-inside: avoid; }
     .historikk-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; margin-bottom: 4px; color: var(--muted); }
     .historikk-status { font-weight: bold; }
     .historikk-status.ok { color: var(--green); }
@@ -79,7 +79,7 @@
     .historikk-status.ir { color: var(--muted); text-decoration: line-through; }
     .historikk-kommentar { font-style: italic; margin-top: 4px; }
     
-    .aktiv-fase-boks { background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-left-width: 4px; transition: all 0.3s ease; }
+    .aktiv-fase-boks { background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-left-width: 4px; transition: all 0.3s ease; page-break-inside: avoid; }
     .border-default { border-left-color: var(--blue); }
     .border-ok { border-left-color: var(--green); background: #f4fdf8; }
     .border-info { border-left-color: var(--yellow); background: #fffdf4; }
@@ -95,28 +95,34 @@
     .kamera-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: 0.2s; flex-shrink: 0; }
     .kamera-btn:hover { background: var(--surface2); }
     
-    .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-    .bilde-galleri img { height: 120px; border: 1px solid var(--border); border-radius: 4px; object-fit: cover; cursor: pointer; transition: 0.2s; }
-    .bilde-galleri img:hover { opacity: 0.8; filter: brightness(0.9); }
+    .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; width: 100%; }
+    .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 250px; }
+    .bilde-galleri-item img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; object-fit: contain; }
+    .bilde-galleri-item img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); }
+    .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); page-break-inside: avoid; }
     .logg-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
+    /* Strengere PDF-regler for å unngå at ting forsvinner ut av rammen */
     .pdf-mode .kamera-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
-    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; }
+    .pdf-mode .aktiv-fase-boks { border: 1px solid var(--border) !important; background: var(--surface) !important; display: block; padding: 12px; }
+    .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
+    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: block; margin-bottom: 6px; }
     .pdf-mode select::-ms-expand { display: none; }
     .pdf-mode .fase-tittel { color: var(--ink); }
-    .pdf-mode .punkt-kommentar { border: none !important; background: transparent !important; padding: 0 !important; font-style: italic; }
+    .pdf-mode .punkt-kommentar { display: block; width: 100%; padding: 0 !important; margin-bottom: 8px; border: none !important; background: transparent !important; font-style: normal; }
+    .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; }
+    .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v3.4</span></h1>
+    <h1>Modellkontroll <span class="version">v3.5</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -203,10 +209,6 @@
 
   <div id="listeInnhold"></div>
   
-  <div style="margin-top: 20px; text-align: center;" class="pdf-skjul">
-    <button class="btn btn-secondary" onclick="leggTilFrittPunkt()" style="border: 1px dashed var(--muted); color: var(--muted);">➕ Legg til fritt kontrollpunkt</button>
-  </div>
-
   <div class="kategori-panel" style="margin-top: 30px;">
     <div class="kategori-header" onclick="toggleOppsummering()">
       <span id="oppsummeringPil">▼ Oppsummering og logg</span>
@@ -248,7 +250,6 @@ const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
 
-// Gjenopprett kamera globalt for historikk-visningen
 window.gaTilKameraState = async function(camStr) {
   try {
     const cam = JSON.parse(decodeURIComponent(camStr));
@@ -305,8 +306,8 @@ async function init() {
   }
 }
 
-// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) + KAMERA ===
-document.addEventListener('paste', async (e) => {
+// === OVERVÅKING AV UTKLIPPSTAVLE (CTRL+V) ===
+document.addEventListener('paste', (e) => {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   let imageItem = null;
   
@@ -334,33 +335,34 @@ document.addEventListener('paste', async (e) => {
 
   e.preventDefault();
   
-  // Hent kamera hvis vi er i Trimble
-  let cameraState = null;
-  try {
-    if (API && API.viewer && typeof API.viewer.getCamera === 'function') {
-      cameraState = await API.viewer.getCamera();
-    }
-  } catch(err) { console.warn("Kunne ikke fange kamera ved Ctrl+V", err); }
-  
   const blob = imageItem.getAsFile();
   const reader = new FileReader();
   
-  reader.onload = (event) => {
+  reader.onload = async (event) => {
     const base64 = event.target.result;
+    
+    let cameraState = null;
+    try {
+      if (API && API.viewer && typeof API.viewer.getCamera === 'function') {
+        cameraState = await API.viewer.getCamera();
+      }
+    } catch(err) { console.warn("Kunne ikke fange kamera ved Ctrl+V", err); }
+
     const imgData = { src: base64, camera: cameraState };
     
     if (isBeskrivelse) {
       beskrivelseData.bilder.push(imgData);
       oppdaterBeskrivelseGalleriUI();
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      setStatus('📋 Manuelt skjermbilde limt inn i generell beskrivelse.');
+      setStatus('📋 Skjermbilde limt inn i generell beskrivelse.');
     } else if (targetPunktId) {
       ksData[targetPunktId][aktivFase].bilder.push(imgData);
       oppdaterGalleriUI(targetPunktId);
       $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      setStatus(`📋 Manuelt skjermbilde limt inn under ${aktivFase}.`);
+      setStatus(`📋 Skjermbilde limt inn under ${aktivFase}.`);
     }
   };
+  
   reader.readAsDataURL(blob);
 });
 
@@ -370,12 +372,10 @@ async function taBildeBeskrivelse() {
     let cameraState = null;
     
     if (API && API.viewer) {
-      // Hent Bilde
       const methods = [API.viewer.getSnapshot, API.viewer.getScreenshot, API.viewer.captureScreenshot];
       for (let m of methods) { if (typeof m === 'function') { base64 = await m.bind(API.viewer)(); break; } }
       if(!base64) throw new Error("Ingen metoder funnet.");
       
-      // Hent Kamera
       if (typeof API.viewer.getCamera === 'function') {
         cameraState = await API.viewer.getCamera();
       }
@@ -405,7 +405,7 @@ function oppdaterBeskrivelseGalleriUI() {
     const cam = imgObj.camera;
     
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = "display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 150px;";
+    wrapper.className = 'bilde-galleri-item';
     
     const img = document.createElement('img');
     img.src = src;
@@ -602,16 +602,16 @@ function leggTilFrittPunkt() {
   if(!tekst || tekst.trim() === '') return;
   
   const id = 'fri_' + Date.now();
-  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
+  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
   if(!egendefKat) {
-    egendefKat = { navn: "Egendefinerte punkter", punkter: [] };
+    egendefKat = { navn: "Egendefinerte kontrollpunkter", punkter: [] };
     strukturData[valgtFag].kategorier.push(egendefKat);
   }
   egendefKat.punkter.push({ id: id, tekst: tekst });
   ksData[id] = {};
   faseRekkefolge.forEach(f => { ksData[id][f] = { status: '', kommentar: '', bilder: [] }; });
   
-  openCategories.add("Egendefinerte punkter");
+  openCategories.add("Egendefinerte kontrollpunkter");
   tegnKategorier();
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
   setTimeout(() => { $('exportContainer').scrollTop = $('exportContainer').scrollHeight; }, 100);
@@ -619,10 +619,10 @@ function leggTilFrittPunkt() {
 
 function slettFrittPunkt(punktId) {
   if(!confirm("Er du sikker på at du vil slette dette egendefinerte punktet?")) return;
-  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte punkter");
+  let egendefKat = strukturData[valgtFag].kategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
   if(egendefKat) {
     egendefKat.punkter = egendefKat.punkter.filter(p => p.id !== punktId);
-    if(egendefKat.punkter.length === 0) strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte punkter");
+    if(egendefKat.punkter.length === 0) strukturData[valgtFag].kategorier = strukturData[valgtFag].kategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
   }
   delete ksData[punktId];
   tegnKategorier();
@@ -644,14 +644,14 @@ function tegnKategorier() {
   main.innerHTML = '';
   
   const alleKategorier = strukturData[valgtFag]?.kategorier || [];
-  const standardKat = alleKategorier.filter(k => k.navn !== "Egendefinerte punkter");
-  let egendefKat = alleKategorier.find(k => k.navn === "Egendefinerte punkter");
+  const standardKat = alleKategorier.filter(k => k.navn !== "Egendefinerte kontrollpunkter");
+  let egendefKat = alleKategorier.find(k => k.navn === "Egendefinerte kontrollpunkter");
 
   const renderKat = (kat, isCustomContainer) => {
     const panel = document.createElement('div');
     panel.className = 'kategori-panel';
     
-    const catName = kat ? kat.navn : "Egendefinerte punkter";
+    const catName = (kat && kat.navn) ? kat.navn : "Egendefinerte kontrollpunkter";
     const pktCount = kat ? kat.punkter.length : 0;
     const isOpen = openCategories.has(catName);
 
@@ -690,15 +690,15 @@ function tegnKategorier() {
               if (historikkData.kommentar) html += `<div class="historikk-kommentar">«${historikkData.kommentar}»</div>`;
               
               if (historikkData.bilder && historikkData.bilder.length > 0) {
-                html += `<div class="bilde-galleri" style="margin-top:8px;">`;
+                html += `<div class="bilde-galleri">`;
                 historikkData.bilder.forEach(imgObj => { 
                   const src = imgObj.src || imgObj;
                   const cam = imgObj.camera;
-                  html += `<div style="display:inline-flex; flex-direction:column; gap:4px; max-width:150px;">
+                  html += `<div class="bilde-galleri-item">
                              <img src="${src}" onclick="window.open('${src}', '_blank')">`;
                   if (cam) {
                     const camStr = encodeURIComponent(JSON.stringify(cam));
-                    html += `<button class="btn btn-secondary pdf-skjul" style="font-size:9px; padding:3px;" onclick="window.gaTilKameraState('${camStr}')">📍 Vis ståsted</button>`;
+                    html += `<button class="btn btn-secondary pdf-skjul" style="font-size:9px; padding:3px; width:100%; margin-top:4px;" onclick="window.gaTilKameraState('${camStr}')">📍 Vis ståsted</button>`;
                   }
                   html += `</div>`;
                 });
@@ -809,7 +809,6 @@ function validerAktivFase() {
   return !harFeil;
 }
 
-// === BILDE-LOGIKK FOR PUNKT MED KAMERA ===
 async function taBilde(punktId) {
   try {
     let base64;
@@ -851,7 +850,7 @@ function oppdaterGalleriUI(punktId) {
     const cam = imgObj.camera;
     
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = "display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 150px;";
+    wrapper.className = 'bilde-galleri-item';
     
     const img = document.createElement('img');
     img.src = src;
@@ -868,7 +867,7 @@ function oppdaterGalleriUI(punktId) {
     if (cam) {
       const btn = document.createElement('button');
       btn.className = "btn btn-secondary pdf-skjul";
-      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px;";
+      btn.style.cssText = "font-size: 9px; padding: 3px 6px; width: 100%; border-radius: 4px; margin-top: 4px;";
       btn.innerHTML = "📍 Vis ståsted";
       btn.onclick = () => window.gaTilKameraState(encodeURIComponent(JSON.stringify(cam)));
       wrapper.appendChild(btn);
