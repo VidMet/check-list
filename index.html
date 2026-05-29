@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.0</title>
+  <title>Modellkontroll v4.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -43,11 +43,10 @@
     .signatur-boks label { font-size: 11px; font-family: var(--mono); font-weight: 600; color: var(--ink); }
     
     .model-selector { position: relative; display: inline-block; }
-    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 320px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
+    .model-dropdown { display: none; position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; max-height: 400px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; padding: 8px; }
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
-    .model-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-family: var(--mono); padding: 4px; border-radius: 4px; border-bottom: 1px solid var(--bg); }
+    .model-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); cursor: pointer; padding: 4px; border-radius: 4px; }
     .model-label:hover { background: var(--bg); }
-    .rev-input { width: 45px; font-size: 10px; font-family: var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; text-align: center; }
     
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -60,6 +59,7 @@
     .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
     .summary-table th { background: var(--surface2); font-weight: bold; }
     
+    /* Ny tabell for modellversjoner */
     .model-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--sans); }
     .model-summary-table th, .model-summary-table td { border: 1px solid var(--border); padding: 6px; text-align: center; }
     .model-summary-table th { background: var(--surface2); font-weight: bold; }
@@ -130,8 +130,8 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.0</span></h1>
-    <p>Sporing av avvik og versjonskontroll i BIM</p>
+    <h1>Modellkontroll <span class="version">v4.1</span></h1>
+    <p>Sporing av avvik og automatisk versjonskontroll</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
     <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
@@ -216,7 +216,7 @@
       <tbody id="sumSignaturer"></tbody>
     </table>
     <div style="margin-top: 20px;">
-      <strong>Modellversjoner per fase:</strong><br><br>
+      <strong>Sporet filhistorikk for kontrollerte modeller:</strong><br><br>
       <div id="sumModeller"></div>
     </div>
   </div>
@@ -272,7 +272,8 @@ let signaturData = {};
 
 let beskrivelseData = { tekst: '', bilder: [] };
 let oppsummeringLogg = [];
-let modellHistorikk = {}; // NYTT: Lagrer versjonskoder per modell og fase
+let modellHistorikk = {}; 
+let gjeldendeVersjoner = {}; // Lagrer usynlig UUID/Hash per modell fra siste scan
 
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('statusBar').textContent = m; };
@@ -543,12 +544,17 @@ function oppdaterOppsummeringUI() {
   });
 }
 
+// === AUTOMATISK SYSTEM-VERSJONS-SCAN ===
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
+  gjeldendeVersjoner = {}; 
+  
   try {
     if (API && API.viewer) {
       const nameMap = new Map();
+      const versionMap = new Map();
+      
       const srcs = [() => API.models?.getModels(), () => API.viewer?.getModels()];
       for (const src of srcs) {
         try {
@@ -557,22 +563,34 @@ async function hentModeller() {
           list.forEach(m => {
             const id = m.id || m.modelId;
             const fn = [m.name, m.fileName, m.filename].find(v => /\.ifc/i.test(v));
-            if (id && fn) nameMap.set(id, lastPathPart(fn));
+            if (id && fn) {
+                nameMap.set(id, lastPathPart(fn));
+                versionMap.set(id, m.versionId || m.id || 'ukjent');
+            }
           });
         } catch(e){}
       }
 
       const objs = await API.viewer.getObjects();
       const gyldigeModeller = (objs || []).map(m => {
+        const mid = m.modelId || m.modelid;
         return {
-          id: m.modelId || m.modelid,
-          name: nameMap.get(m.modelId || m.modelid) || m.name || 'Ukjent modell',
+          id: mid,
+          name: nameMap.get(mid) || m.name || 'Ukjent modell',
+          versionId: versionMap.get(mid) || 'ukjent',
           antallObjekter: (m.objects || []).length
         };
       }).filter(m => m.antallObjekter > 0); 
-      tilgjengeligeModeller = gyldigeModeller.map(m => ({ id: m.id, name: m.name }));
+      
+      tilgjengeligeModeller = gyldigeModeller.map(m => {
+          gjeldendeVersjoner[m.name] = m.versionId; // Lagrer den usynlige IDen
+          return { id: m.id, name: m.name };
+      });
+      
     } else {
       tilgjengeligeModeller = [ {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, {id: 'm2', name: 'E6_Rekkverk.ifc'} ];
+      gjeldendeVersjoner['E6_Vegmodell_R761.ifc'] = 'lokal_test_1';
+      gjeldendeVersjoner['E6_Rekkverk.ifc'] = 'lokal_test_2';
     }
     
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
@@ -600,11 +618,6 @@ function tegnModellListe() {
   
   modellerÅVise.forEach(mName => {
     const isChecked = valgteModeller.includes(mName) ? 'checked' : '';
-    const safeId = encodeURIComponent(mName).replace(/[^a-zA-Z0-9]/g, '_');
-    
-    // Henter lagret versjon for modellen i aktiv fase (hvis den finnes)
-    const defaultRev = (modellHistorikk[mName] && modellHistorikk[mName][aktivFase]) ? modellHistorikk[mName][aktivFase] : '';
-
     const label = document.createElement('label');
     label.className = 'model-label';
     label.innerHTML = `
@@ -612,7 +625,6 @@ function tegnModellListe() {
         <input type="checkbox" value="${mName}" onchange="oppdaterValgteModeller()" ${isChecked}>
         <span title="${mName}">${mName}</span>
       </div>
-      <input type="text" id="rev_${safeId}" class="rev-input" value="${defaultRev}" placeholder="Rev" onchange="oppdaterValgteModeller()">
     `;
     container.appendChild(label);
   });
@@ -625,20 +637,22 @@ function toggleAlleModeller(masterCheckbox) {
   oppdaterValgteModeller();
 }
 
-// Oppdatert for å også lagre versjonskoder
 function oppdaterValgteModeller() {
   valgteModeller = [];
-  const labels = $('modelList').querySelectorAll('.model-label');
+  const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   
-  labels.forEach(lbl => {
-      const cb = lbl.querySelector('input[type="checkbox"]');
-      const revInput = lbl.querySelector('input[type="text"]');
+  checkboxes.forEach(cb => {
       const mName = cb.value;
-      
       if(cb.checked) {
           valgteModeller.push(mName);
           if (!modellHistorikk[mName]) modellHistorikk[mName] = {};
-          modellHistorikk[mName][aktivFase] = revInput.value.trim();
+          
+          // Hvis vi nettopp har scannet, bruker vi fersk ID. Hvis ikke, beholder vi det som lå i JSON
+          if (gjeldendeVersjoner[mName]) {
+              modellHistorikk[mName][aktivFase] = gjeldendeVersjoner[mName];
+          } else if (!modellHistorikk[mName][aktivFase]) {
+              modellHistorikk[mName][aktivFase] = 'ukjent';
+          }
       }
   });
 
@@ -666,9 +680,8 @@ function byttFase(fase) {
     modelBtn.disabled = false;
     modelBtn.style.opacity = '1';
   } else {
-    // Lar dem velge modeller også i andre faser for å oppdatere revisjon
-    scanBtn.disabled = true;
-    scanBtn.style.opacity = '0.5';
+    scanBtn.disabled = false;
+    scanBtn.style.opacity = '1';
     modelBtn.disabled = false;
     modelBtn.style.opacity = '1';
   }
@@ -680,7 +693,7 @@ function byttFase(fase) {
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
-  tegnModellListe(); // Oppdaterer input-boksene med riktig revisjon for den nye fasen
+  tegnModellListe(); 
   oppdaterValgteModeller();
   tegnKategorier(); 
 }
@@ -1110,7 +1123,7 @@ function signerFase() {
   const initialer = $('brukerInitialer').value.trim();
   if (!initialer) { alert("Vennligst skriv inn initialene dine i signatur-feltet øverst."); return; }
   
-  oppdaterValgteModeller(); // Sikre at vi fanger opp eventuelle siste endringer i versjonskoder
+  oppdaterValgteModeller(); 
   
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   signaturData[aktivFase] = { initialer: initialer, dato: dato };
@@ -1138,7 +1151,6 @@ function byggPDFSummary() {
   const fagNavnStr = valgteFag.length > 1 ? 'Flere fag' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Ingen fag');
   $('sumFag').innerText = fagNavnStr;
   
-  // Bygger versjonstabellen
   let modelHtml = '<table class="model-summary-table"><thead><tr><th>Modellfil</th>';
   faseRekkefolge.forEach(f => modelHtml += `<th>${f}</th>`);
   modelHtml += '</tr></thead><tbody>';
@@ -1148,8 +1160,20 @@ function byggPDFSummary() {
          const hist = modellHistorikk[mName];
          if (Object.keys(hist).length > 0) {
              modelHtml += `<tr><td>${mName}</td>`;
+             let lastVersion = null;
              faseRekkefolge.forEach(f => {
-                 modelHtml += `<td>${hist[f] || '-'}</td>`;
+                 const thisVersion = hist[f];
+                 if (!thisVersion) {
+                     modelHtml += `<td style="color:var(--muted);">-</td>`;
+                 } else if (!lastVersion) {
+                     modelHtml += `<td style="color:var(--ink); font-weight:bold;">Sjekket</td>`;
+                     lastVersion = thisVersion;
+                 } else if (thisVersion === lastVersion) {
+                     modelHtml += `<td style="color:var(--muted);">Uendret</td>`;
+                 } else {
+                     modelHtml += `<td style="color:var(--blue); font-weight:bold;">Oppdatert</td>`;
+                     lastVersion = thisVersion;
+                 }
              });
              modelHtml += `</tr>`;
          }
@@ -1173,7 +1197,7 @@ function byggPDFSummary() {
 
 function eksporterPDF() {
   if (!validerAktivFase()) return;
-  oppdaterValgteModeller(); // Sikre at vi får med oss tabellrevisjoner
+  oppdaterValgteModeller(); 
   
   const descPanel = $('beskrivelsePanel');
   if (beskrivelseData.tekst.trim() === '' && beskrivelseData.bilder.length === 0) {
@@ -1225,7 +1249,7 @@ function eksporterPDF() {
 
 async function lagreLokalt() {
   if (!validerAktivFase()) return;
-  oppdaterValgteModeller(); // Sikre at tabellrevisjoner blir med i fila
+  oppdaterValgteModeller(); 
 
   const eksportData = {
     metadata: {
@@ -1233,7 +1257,7 @@ async function lagreLokalt() {
       sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
       modeller: valgteModeller,
-      modellHistorikk: modellHistorikk, // NY
+      modellHistorikk: modellHistorikk,
       signaturer: signaturData,
       beskrivelseData: beskrivelseData,
       oppsummeringLogg: oppsummeringLogg
@@ -1295,7 +1319,7 @@ function lastInnFil(event) {
       
       if (data.metadata) {
         valgteModeller = data.metadata.modeller || [];
-        modellHistorikk = data.metadata.modellHistorikk || {}; // NY
+        modellHistorikk = data.metadata.modellHistorikk || {}; 
         signaturData = data.metadata.signaturer || {};
         
         beskrivelseData = data.metadata.beskrivelseData || { tekst: '', bilder: [] };
@@ -1330,7 +1354,6 @@ function lastInnFil(event) {
       aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
       $('faseFilter').value = aktivFase;
       
-      // Vi tegner modellen så vi får med versjonsdata
       tilgjengeligeModeller = valgteModeller.map(m => ({name: m}));
       
       const modelBtn = $('modelBtn');
