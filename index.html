@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.7</title>
+  <title>Modellkontroll v2.8</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -67,7 +67,6 @@
     
     .punkt-container { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; background: var(--surface); gap: 10px; page-break-inside: avoid; }
     
-    /* Sletteknapp for frie punkter */
     .punkt-tekst-tittel { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; }
     .slett-btn { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 3px 6px; font-size: 10px; font-family: var(--mono); cursor: pointer; opacity: 0.7; transition: 0.2s; }
     .slett-btn:hover { opacity: 1; background: var(--red); color: white; }
@@ -113,11 +112,14 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.7</span></h1>
+    <h1>Modellkontroll <span class="version">v2.8</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
-  <div>
-    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--green); margin-right:10px;">🟢 Lese-modus</span>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <select id="mappeVelger" style="font-size: 11px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 180px; background: var(--surface);">
+      <option value="">Laster mapper...</option>
+    </select>
+    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--green); margin-right:4px;">🟢 Lese-modus</span>
     <button class="btn btn-primary" onclick="lagreTilProsjekt()">☁️ Lagre prosjektfil</button>
   </div>
 </header>
@@ -213,8 +215,10 @@ async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
     setStatus('✅ Tilkoblet Trimble Connect Workspace API');
+    hentMapper(); // Kaller ny funksjon for å hente destinasjonsmapper
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
+    $('mappeVelger').innerHTML = '<option value="lokal">Kun lokal nedlasting</option>';
   }
   
   try {
@@ -241,7 +245,32 @@ async function init() {
   }
 }
 
-// IDENTISK MODELLSCAN SOM I EGENSKAPSVALIDERING
+// NY FUNKSJON: Henter mapper i prosjektet for lagring
+async function hentMapper() {
+  const velger = $('mappeVelger');
+  try {
+    if (API && API.project && typeof API.project.getFolders === 'function') {
+      const mapper = await API.project.getFolders();
+      velger.innerHTML = '';
+      if (mapper && mapper.length > 0) {
+        mapper.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id || m.folderId || m.name;
+          opt.innerText = `📂 ${m.name}`;
+          velger.appendChild(opt);
+        });
+      } else {
+        velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
+      }
+    } else {
+      velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
+    }
+  } catch (e) {
+    console.warn("Kunne ikke hente prosjektmapper, bruker root som fallback", e);
+    velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
+  }
+}
+
 async function hentModeller() {
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
@@ -257,7 +286,7 @@ async function hentModeller() {
           const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
           list.forEach(m => {
             const id = m.id || m.modelId;
-            const fn = [m.name, m.fileName, m.filename].find(v => /\.ifc/i.test(v));
+            const fn = [m.name, m.fileName, m.filename].find(v => /\\.ifc/i.test(v));
             if (id && fn) nameMap.set(id, lastPathPart(fn));
           });
         } catch(e){}
@@ -278,7 +307,6 @@ async function hentModeller() {
       tilgjengeligeModeller = gyldigeModeller.map(m => ({ id: m.id, name: m.name }));
 
     } else {
-      // Fallback lokalt
       tilgjengeligeModeller = [
         {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, 
         {id: 'm2', name: 'E6_Rekkverk.ifc'}
@@ -597,7 +625,6 @@ function validerAktivFase() {
   return !harFeil;
 }
 
-// HELGARDERT BILDE-FUNKSJON
 async function taBilde(punktId) {
   try {
     let base64;
@@ -754,13 +781,14 @@ function eksporterPDF() {
   });
 }
 
-function lagreTilProsjekt() {
+// NY LAGRINGSFUNKSJON MED API-INTEGRASJON OG SIKKERHETSKOPI
+async function lagreTilProsjekt() {
   if (!validerAktivFase()) {
     alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før lagring.");
     return;
   }
 
-  $('syncStatus').innerText = '⏳ Synkroniserer...';
+  $('syncStatus').innerText = '⏳ Klargjør fil...';
   
   const eksportData = {
     metadata: {
@@ -774,11 +802,43 @@ function lagreTilProsjekt() {
     strukturDataEndringer: strukturData 
   };
   
-  setTimeout(() => {
-    $('syncStatus').innerText = `🟢 Synkronisert (Sist lagret: ${aktivFase})`;
-    setStatus(`Prosjektfil er klargjort for Trimble lagring.`);
-    console.log("JSON som vil bli skrevet til Trimble:", eksportData);
-  }, 1200);
+  const jsonString = JSON.stringify(eksportData, null, 2);
+  const filnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const mappeId = $('mappeVelger').value;
+
+  try {
+    $('syncStatus').innerText = '⏳ Laster opp til Trimble...';
+    
+    const file = new File([blob], filnavn, { type: 'application/json' });
+    
+    // Forsøker opplasting til skyen hvis API-et tillater det
+    if (API && API.file && typeof API.file.upload === 'function') {
+        await API.file.upload(mappeId, file);
+    } else if (API && API.project && typeof API.project.uploadFile === 'function') {
+        await API.project.uploadFile({ folderId: mappeId, file: file });
+    } else {
+        throw new Error("Opplastingsmetode ikke funnet i API");
+    }
+    
+    $('syncStatus').innerText = `🟢 Lagret i Trimble (${aktivFase})`;
+    setStatus(`✅ Filen ble lagret til mappen i Trimble Connect.`);
+    
+  } catch (e) {
+    console.warn("Kunne ikke lagre til skyen. Utfører lokal nedlasting som sikkerhetskopi.", e);
+    $('syncStatus').innerText = '⚠️ Sky-lagring feilet';
+    setStatus(`⚠️ Lagring til Trimble feilet. Laster ned lokalt som sikkerhetskopi...`);
+    
+    // Fallback: Tvinger frem en lokal nedlasting hvis sky-opplasting feiler
+    const url = URL.createObjectURL(blob);
+    const lenke = document.createElement("a");
+    lenke.href = url;
+    lenke.download = filnavn;
+    document.body.appendChild(lenke);
+    lenke.click();
+    document.body.removeChild(lenke);
+    URL.revokeObjectURL(url);
+  }
 }
 
 init();
