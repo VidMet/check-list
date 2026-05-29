@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v2.8</title>
+  <title>Modellkontroll v2.9</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -112,15 +112,14 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v2.8</span></h1>
+    <h1>Modellkontroll <span class="version">v2.9</span></h1>
     <p>Sporing av avvik og utbedring i BIM</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
-    <select id="mappeVelger" style="font-size: 11px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 180px; background: var(--surface);">
-      <option value="">Laster mapper...</option>
-    </select>
-    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--green); margin-right:4px;">🟢 Lese-modus</span>
-    <button class="btn btn-primary" onclick="lagreTilProsjekt()">☁️ Lagre prosjektfil</button>
+    <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
+    <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne eksisterende kontroll</button>
+    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--muted); margin-right:4px;">Ulagret</span>
+    <button class="btn btn-primary" onclick="lagreLokalt()">💾 Lagre prosjektfil (.json)</button>
   </div>
 </header>
 
@@ -183,7 +182,7 @@
       <tbody id="sumSignaturer"></tbody>
     </table>
     <div style="font-size: 12px;">
-      <strong>Kontrollerte modeller i 3D-visning:</strong><br>
+      <strong>Kontrollerte modeller:</strong><br>
       <div id="sumModeller" style="color: var(--ink); font-family: var(--sans);"></div>
     </div>
   </div>
@@ -215,10 +214,8 @@ async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
     setStatus('✅ Tilkoblet Trimble Connect Workspace API');
-    hentMapper(); // Kaller ny funksjon for å hente destinasjonsmapper
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
-    $('mappeVelger').innerHTML = '<option value="lokal">Kun lokal nedlasting</option>';
   }
   
   try {
@@ -241,33 +238,7 @@ async function init() {
       tegnKategorier();
     }
   } catch(e) {
-    setStatus('❌ Kunne ikke laste sjekklister.json.');
-  }
-}
-
-// NY FUNKSJON: Henter mapper i prosjektet for lagring
-async function hentMapper() {
-  const velger = $('mappeVelger');
-  try {
-    if (API && API.project && typeof API.project.getFolders === 'function') {
-      const mapper = await API.project.getFolders();
-      velger.innerHTML = '';
-      if (mapper && mapper.length > 0) {
-        mapper.forEach(m => {
-          const opt = document.createElement('option');
-          opt.value = m.id || m.folderId || m.name;
-          opt.innerText = `📂 ${m.name}`;
-          velger.appendChild(opt);
-        });
-      } else {
-        velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
-      }
-    } else {
-      velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
-    }
-  } catch (e) {
-    console.warn("Kunne ikke hente prosjektmapper, bruker root som fallback", e);
-    velger.innerHTML = '<option value="root">Prosjektets hovedmappe</option>';
+    setStatus('❌ Kunne ikke laste standard sjekklister.json.');
   }
 }
 
@@ -286,7 +257,7 @@ async function hentModeller() {
           const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
           list.forEach(m => {
             const id = m.id || m.modelId;
-            const fn = [m.name, m.fileName, m.filename].find(v => /\\.ifc/i.test(v));
+            const fn = [m.name, m.fileName, m.filename].find(v => /\.ifc/i.test(v));
             if (id && fn) nameMap.set(id, lastPathPart(fn));
           });
         } catch(e){}
@@ -333,16 +304,19 @@ function tegnModellListe() {
   const container = $('modelList');
   container.innerHTML = '';
   
-  if(tilgjengeligeModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller synlige i visningen akkurat nå.</span>';
+  if(tilgjengeligeModeller.length === 0 && valgteModeller.length === 0) {
+    container.innerHTML = '<span style="font-size:10px;">Ingen modeller tilgjengelig.</span>';
     return;
   }
   
-  tilgjengeligeModeller.forEach(m => {
-    const isChecked = valgteModeller.includes(m.name) ? 'checked' : '';
+  // Viser de modellene som enten ligger i filen vi lastet, eller er scannet
+  const modellerÅVise = tilgjengeligeModeller.length > 0 ? tilgjengeligeModeller.map(m=>m.name) : valgteModeller;
+  
+  modellerÅVise.forEach(mName => {
+    const isChecked = valgteModeller.includes(mName) ? 'checked' : '';
     const label = document.createElement('label');
     label.className = 'model-label';
-    label.innerHTML = `<input type="checkbox" value="${m.name}" onchange="oppdaterValgteModeller()" ${isChecked}> <span title="${m.name}">${m.name}</span>`;
+    label.innerHTML = `<input type="checkbox" value="${mName}" onchange="oppdaterValgteModeller()" ${isChecked}> <span title="${mName}">${mName}</span>`;
     container.appendChild(label);
   });
 }
@@ -358,7 +332,7 @@ function toggleAlleModeller(masterCheckbox) {
 function oppdaterValgteModeller() {
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   valgteModeller = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-  $('modelBtn').innerText = `📦 Modeller i visning (${valgteModeller.length} valgt) ▼`;
+  $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
   $('syncStatus').innerText = '🟠 Ulagrede endringer';
 }
 
@@ -390,16 +364,9 @@ function byttFase(fase) {
   } else {
     scanBtn.disabled = false;
     scanBtn.style.opacity = '1';
-    
-    if (tilgjengeligeModeller.length > 0) {
-      modelBtn.disabled = false;
-      modelBtn.innerText = `📦 Velg modeller i visningen ▼`;
-      modelBtn.style.opacity = '1';
-      oppdaterValgteModeller(); 
-    } else {
-      modelBtn.disabled = true;
-      modelBtn.innerText = `📦 Skann modeller først ▼`;
-    }
+    modelBtn.disabled = false;
+    modelBtn.style.opacity = '1';
+    oppdaterValgteModeller(); 
   }
   
   $('signerBtn').innerText = `✍️ Signer ${aktivFase}`;
@@ -407,7 +374,7 @@ function byttFase(fase) {
 }
 
 function byggDataStruktur() {
-  const kat = strukturData[valgtFag].kategorier;
+  const kat = strukturData[valgtFag]?.kategorier || [];
   kat.forEach(k => {
     k.punkter.forEach(pkt => {
       if (!ksData[pkt.id]) ksData[pkt.id] = {};
@@ -476,7 +443,7 @@ function getStatusFormat(kode) {
 function tegnKategorier() {
   const main = $('listeInnhold');
   main.innerHTML = '';
-  const kategorier = strukturData[valgtFag].kategorier;
+  const kategorier = strukturData[valgtFag]?.kategorier || [];
 
   kategorier.forEach(kat => {
     const panel = document.createElement('div');
@@ -636,7 +603,7 @@ async function taBilde(punktId) {
       } else if (typeof API.viewer.captureScreenshot === 'function') {
         base64 = await API.viewer.captureScreenshot();
       } else {
-        throw new Error("Fant ingen kompatibel skjermbildemetode i API-et.");
+        throw new Error("Fant ingen kompatibel skjermbildemetode.");
       }
     } else {
       const canvas = document.createElement('canvas');
@@ -781,15 +748,13 @@ function eksporterPDF() {
   });
 }
 
-// NY LAGRINGSFUNKSJON MED API-INTEGRASJON OG SIKKERHETSKOPI
-async function lagreTilProsjekt() {
+// LOKAL LAGRING AV JSON
+function lagreLokalt() {
   if (!validerAktivFase()) {
     alert("Du mangler kommentar på noen punkter. Fyll ut røde felt før lagring.");
     return;
   }
 
-  $('syncStatus').innerText = '⏳ Klargjør fil...';
-  
   const eksportData = {
     metadata: {
       fag: $('fagFilter').value,
@@ -805,40 +770,65 @@ async function lagreTilProsjekt() {
   const jsonString = JSON.stringify(eksportData, null, 2);
   const filnavn = `KS_${$('fagFilter').value}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
   const blob = new Blob([jsonString], { type: 'application/json' });
-  const mappeId = $('mappeVelger').value;
+  
+  const url = URL.createObjectURL(blob);
+  const lenke = document.createElement("a");
+  lenke.href = url;
+  lenke.download = filnavn;
+  document.body.appendChild(lenke);
+  lenke.click();
+  document.body.removeChild(lenke);
+  URL.revokeObjectURL(url);
+  
+  $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
+  setStatus(`✅ Filen ble lastet ned. Dra den inn i riktig mappe i Trimble Connect via nettleseren.`);
+}
 
-  try {
-    $('syncStatus').innerText = '⏳ Laster opp til Trimble...';
-    
-    const file = new File([blob], filnavn, { type: 'application/json' });
-    
-    // Forsøker opplasting til skyen hvis API-et tillater det
-    if (API && API.file && typeof API.file.upload === 'function') {
-        await API.file.upload(mappeId, file);
-    } else if (API && API.project && typeof API.project.uploadFile === 'function') {
-        await API.project.uploadFile({ folderId: mappeId, file: file });
-    } else {
-        throw new Error("Opplastingsmetode ikke funnet i API");
+// INNLESING AV EKSISTERENDE JSON-FIL
+function lastInnFil(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      
+      if (data.strukturDataEndringer) strukturData = data.strukturDataEndringer;
+      
+      if (data.metadata) {
+        valgtFag = data.metadata.fag || valgtFag;
+        $('fagFilter').value = valgtFag;
+        valgteModeller = data.metadata.modeller || [];
+        signaturData = data.metadata.signaturer || {};
+      }
+      
+      if (data.kontrollData) ksData = data.kontrollData;
+      
+      aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
+      $('faseFilter').value = aktivFase;
+      
+      byggDataStruktur(); 
+      tegnModellListe(); 
+      
+      const modelBtn = $('modelBtn');
+      if (valgteModeller.length > 0) {
+        modelBtn.innerText = `📦 Modeller (${valgteModeller.length} lastet inn) ▼`;
+      }
+      
+      oppdaterSignaturVisning();
+      byttFase(aktivFase); 
+      
+      $('syncStatus').innerText = '🟢 Fil lastet inn';
+      setStatus(`✅ Vellykket innlasting av fil: ${file.name}`);
+      
+      event.target.value = ''; 
+    } catch (err) {
+      alert("Feil ved lesing av fil. Er du sikker på at dette er en gyldig KS-fil?");
+      console.error(err);
     }
-    
-    $('syncStatus').innerText = `🟢 Lagret i Trimble (${aktivFase})`;
-    setStatus(`✅ Filen ble lagret til mappen i Trimble Connect.`);
-    
-  } catch (e) {
-    console.warn("Kunne ikke lagre til skyen. Utfører lokal nedlasting som sikkerhetskopi.", e);
-    $('syncStatus').innerText = '⚠️ Sky-lagring feilet';
-    setStatus(`⚠️ Lagring til Trimble feilet. Laster ned lokalt som sikkerhetskopi...`);
-    
-    // Fallback: Tvinger frem en lokal nedlasting hvis sky-opplasting feiler
-    const url = URL.createObjectURL(blob);
-    const lenke = document.createElement("a");
-    lenke.href = url;
-    lenke.download = filnavn;
-    document.body.appendChild(lenke);
-    lenke.click();
-    document.body.removeChild(lenke);
-    URL.revokeObjectURL(url);
-  }
+  };
+  reader.readAsText(file);
 }
 
 init();
