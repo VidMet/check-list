@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.3</title>
+  <title>Modellkontroll v4.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -105,10 +105,15 @@
     .bcf-btn:hover { background: var(--yellow-dim); }
 
     .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; width: 100%; }
-    .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 250px; }
+    .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 250px; }
     .bilde-galleri-item img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; object-fit: contain; }
     .bilde-galleri-item img:hover { opacity: 0.8; filter: brightness(0.9); }
     
+    /* Nye klasser for bildetekst */
+    .bilde-caption-input { width: 100%; font-size: 10px; font-family: var(--sans); padding: 4px; border: 1px dashed var(--border); border-radius: 4px; margin-top: 2px; outline: none; background: var(--surface); color: var(--ink); }
+    .bilde-caption-input:focus { border-color: var(--blue); border-style: solid; }
+    .caption-pdf-span { display: none; font-size: 10px; font-style: italic; color: var(--muted); margin-top: 4px; text-align: center; width: 100%; word-break: break-word; }
+
     .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); page-break-inside: avoid; }
     .logg-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .logg-fase { font-weight: 600; color: var(--blue); }
@@ -126,13 +131,15 @@
     .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; }
     .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; }
     .pdf-mode #deltakerTabellBody input[type="text"] { border: none; background: transparent; padding: 0; outline: none; color: var(--ink); font-family: var(--sans); }
+    .pdf-mode .caption-pdf-span { display: block !important; }
+    .pdf-mode .bilde-caption-input { display: none !important; }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.3</span></h1>
+    <h1>Modellkontroll <span class="version">v4.4</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -145,7 +152,6 @@
 
 <div class="toolbar">
   
-  <!-- FASE FØRST -->
   <select id="faseFilter" onchange="byttFase(this.value)" style="font-weight: 600; color: var(--blue);">
     <option value="Egenkontroll">1. Egenkontroll</option>
     <option value="Fagkontroll">2. Fagkontroll</option>
@@ -156,7 +162,6 @@
 
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <!-- FAG ETTERPÅ -->
   <div class="model-selector">
     <button class="btn btn-secondary" id="fagBtn" onclick="toggleFagDropdown()" style="font-weight: bold; color: var(--ink);">📚 Laster fag ▼</button>
     <div id="fagDropdown" class="model-dropdown">
@@ -180,7 +185,7 @@
     <button class="btn" id="modelBtn" onclick="toggleModelDropdown()" disabled>📦 Skann modeller først ▼</button>
     <div id="modelDropdown" class="model-dropdown">
       <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px; justify-content: flex-start;">
-        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visningen
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModels(this)"> Merk alle i visningen
       </label>
       <div id="modelList">
         <span style="font-size:10px; color:var(--muted);">Trykk "Skann 3D-visning" for å finne modeller.</span>
@@ -480,7 +485,7 @@ document.addEventListener('paste', (e) => {
       }
     } catch(err) { console.warn("Kunne ikke fange kamera ved Ctrl+V", err); }
 
-    const imgData = { src: base64, camera: cameraState };
+    const imgData = { src: base64, camera: cameraState, caption: '' };
     
     if (isBeskrivelse) {
       beskrivelseData.bilder.push(imgData);
@@ -521,7 +526,7 @@ async function taBildeBeskrivelse() {
       base64 = canvas.toDataURL();
     }
     
-    beskrivelseData.bilder.push({ src: base64, camera: cameraState });
+    beskrivelseData.bilder.push({ src: base64, camera: cameraState, caption: '' });
     oppdaterBeskrivelseGalleriUI();
     $('syncStatus').innerText = '🟠 Ulagrede endringer';
   } catch (e) {
@@ -535,6 +540,7 @@ function oppdaterBeskrivelseGalleriUI() {
   beskrivelseData.bilder.forEach((imgObj, imgIndex) => {
     const src = imgObj.src || imgObj;
     const cam = imgObj.camera;
+    const caption = imgObj.caption || '';
     
     const wrapper = document.createElement('div');
     wrapper.className = 'bilde-galleri-item';
@@ -550,6 +556,23 @@ function oppdaterBeskrivelseGalleriUI() {
       }
     };
     wrapper.appendChild(img);
+    
+    const capInput = document.createElement('input');
+    capInput.type = 'text';
+    capInput.className = 'bilde-caption-input pdf-skjul';
+    capInput.placeholder = 'Legg til bildetekst...';
+    capInput.value = caption;
+    capInput.oninput = (e) => {
+        beskrivelseData.bilder[imgIndex].caption = e.target.value;
+        capSpan.innerText = e.target.value;
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    };
+    wrapper.appendChild(capInput);
+    
+    const capSpan = document.createElement('div');
+    capSpan.className = 'caption-pdf-span';
+    capSpan.innerText = caption;
+    wrapper.appendChild(capSpan);
     
     if (cam) {
       const btn = document.createElement('button');
@@ -980,8 +1003,12 @@ function tegnKategorier() {
                 historikkData.bilder.forEach(imgObj => { 
                   const src = imgObj.src || imgObj;
                   const cam = imgObj.camera;
+                  const caption = imgObj.caption || '';
                   html += `<div class="bilde-galleri-item">
                              <img src="${src}" onclick="window.open('${src}', '_blank')">`;
+                  if (caption) {
+                    html += `<div style="font-size:10px; font-style:italic; color:var(--muted); margin-top:4px; text-align:center; width:100%; word-break:break-word;">${caption}</div>`;
+                  }
                   if (cam) {
                     const camStr = encodeURIComponent(JSON.stringify(cam));
                     html += `<button class="btn btn-secondary pdf-skjul" style="font-size:9px; padding:3px; width:100%; margin-top:4px;" onclick="window.gaTilKameraState('${camStr}')">📍 Vis ståsted</button>`;
@@ -1162,7 +1189,7 @@ async function taBilde(punktId) {
       base64 = canvas.toDataURL();
     }
     
-    ksData[punktId][aktivFase].bilder.push({ src: base64, camera: cameraState });
+    ksData[punktId][aktivFase].bilder.push({ src: base64, camera: cameraState, caption: '' });
     oppdaterGalleriUI(punktId);
     $('syncStatus').innerText = '🟠 Ulagrede endringer';
     setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
@@ -1178,6 +1205,7 @@ function oppdaterGalleriUI(punktId) {
   bilder.forEach((imgObj, imgIndex) => {
     const src = imgObj.src || imgObj;
     const cam = imgObj.camera;
+    const caption = imgObj.caption || '';
     
     const wrapper = document.createElement('div');
     wrapper.className = 'bilde-galleri-item';
@@ -1193,6 +1221,23 @@ function oppdaterGalleriUI(punktId) {
       }
     };
     wrapper.appendChild(img);
+    
+    const capInput = document.createElement('input');
+    capInput.type = 'text';
+    capInput.className = 'bilde-caption-input pdf-skjul';
+    capInput.placeholder = 'Legg til bildetekst...';
+    capInput.value = caption;
+    capInput.oninput = (e) => {
+        ksData[punktId][aktivFase].bilder[imgIndex].caption = e.target.value;
+        capSpan.innerText = e.target.value;
+        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    };
+    wrapper.appendChild(capInput);
+    
+    const capSpan = document.createElement('div');
+    capSpan.className = 'caption-pdf-span';
+    capSpan.innerText = caption;
+    wrapper.appendChild(capSpan);
     
     if (cam) {
       const btn = document.createElement('button');
