@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.5</title>
+  <title>Modellkontroll v4.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -70,13 +70,13 @@
     .kategori-header:hover { background: #d1d5db; }
     .kategori-body { display: none; flex-direction: column; }
     
-    .punkt-container { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; background: var(--surface); gap: 10px; page-break-inside: avoid; }
+    .punkt-container { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; background: var(--surface); gap: 10px; page-break-inside: avoid; break-inside: avoid; }
     
     .punkt-tekst-tittel { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; }
     .slett-btn { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 3px 6px; font-size: 10px; font-family: var(--mono); cursor: pointer; opacity: 0.7; transition: 0.2s; }
     .slett-btn:hover { opacity: 1; background: var(--red); color: white; }
 
-    .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; margin-bottom: 4px; page-break-inside: avoid; }
+    .historikk-blokk { background: var(--bg); border-left: 3px solid var(--muted); padding: 8px 12px; font-size: 12px; border-radius: 0 4px 4px 0; margin-bottom: 4px; page-break-inside: avoid; break-inside: avoid; }
     .historikk-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; margin-bottom: 4px; color: var(--muted); }
     .historikk-status { font-weight: bold; }
     .historikk-status.ok { color: var(--green); }
@@ -85,7 +85,7 @@
     .historikk-status.ir { color: var(--muted); text-decoration: line-through; }
     .historikk-kommentar { font-style: italic; margin-top: 4px; }
     
-    .aktiv-fase-boks { background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-left-width: 4px; transition: all 0.3s ease; page-break-inside: avoid; }
+    .aktiv-fase-boks { background: #f8fafc; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-left-width: 4px; transition: all 0.3s ease; page-break-inside: avoid; break-inside: avoid; }
     .border-default { border-left-color: var(--blue); }
     .border-ok { border-left-color: var(--green); background: #f4fdf8; }
     .border-info { border-left-color: var(--yellow); background: #fffdf4; }
@@ -105,7 +105,7 @@
     .bcf-btn:hover { background: var(--yellow-dim); }
 
     .bilde-galleri { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; width: 100%; }
-    .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 250px; }
+    .bilde-galleri-item { display: inline-flex; flex-direction: column; gap: 4px; align-items: center; max-width: 250px; page-break-inside: avoid; break-inside: avoid; }
     .bilde-galleri-item img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; object-fit: contain; }
     .bilde-galleri-item img:hover { opacity: 0.8; filter: brightness(0.9); }
     
@@ -113,22 +113,24 @@
     .bilde-caption-input:focus { border-color: var(--blue); border-style: solid; }
     .caption-pdf-span { display: none; font-size: 10px; font-style: italic; color: var(--muted); margin-top: 4px; text-align: center; width: 100%; word-break: break-word; }
 
-    .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); page-break-inside: avoid; }
+    .logg-element { background: var(--surface2); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--blue); page-break-inside: avoid; break-inside: avoid; }
     .logg-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* PDF Styling */
+    /* PDF Styling - Oppdatert for å beholde farger! */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
-    .pdf-mode .aktiv-fase-boks { border: 1px solid var(--border) !important; background: var(--surface) !important; display: block; padding: 12px; }
+    
+    .pdf-mode .aktiv-fase-boks { display: block; padding: 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+    
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: block; margin-bottom: 6px; }
     .pdf-mode select::-ms-expand { display: none; }
     .pdf-mode .fase-tittel { color: var(--ink); }
     .pdf-mode .punkt-kommentar { display: block; width: 100%; padding: 0 !important; margin-bottom: 8px; border: none !important; background: transparent !important; font-style: normal; }
-    .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; }
-    .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; }
+    .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
+    .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; break-inside: avoid; }
     .pdf-mode #deltakerTabellBody input[type="text"] { border: none; background: transparent; padding: 0; outline: none; color: var(--ink); font-family: var(--sans); }
     .pdf-mode .caption-pdf-span { display: block !important; }
     .pdf-mode .bilde-caption-input { display: none !important; }
@@ -138,7 +140,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.5</span></h1>
+    <h1>Modellkontroll <span class="version">v4.6</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -248,7 +250,7 @@
      </div>
   </div>
 
-  <div id="beskrivelsePanel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+  <div id="beskrivelsePanel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; page-break-inside: avoid;">
     <textarea id="beskrivelseTekst" class="punkt-kommentar" placeholder="Generell beskrivelse av kontrollen... (Tips: Du kan lime inn skjermbilder direkte her med Ctrl+V)"></textarea>
     <div class="pdf-skjul">
       <button class="kamera-btn" onclick="taBildeBeskrivelse()" style="display: inline-flex;">📷 Legg til 3D-bilde i beskrivelsen</button>
@@ -262,7 +264,7 @@
 
   <div id="listeInnhold"></div>
 
-  <div class="kategori-panel" style="margin-top: 30px;">
+  <div class="kategori-panel" style="margin-top: 30px; page-break-inside: avoid;">
     <div class="kategori-header" onclick="toggleOppsummering()">
       <span id="oppsummeringPil">▼ Oppsummering og logg</span>
     </div>
@@ -1006,7 +1008,7 @@ function tegnKategorier() {
                   html += `<div class="bilde-galleri-item">
                              <img src="${src}" onclick="window.open('${src}', '_blank')">`;
                   if (caption) {
-                    html += `<div style="font-size:10px; font-style:italic; color:var(--muted); margin-top:4px; text-align:center; width:100%; word-break:break-word;">${caption}</div>`;
+                    html += `<div class="caption-pdf-span" style="display:block;">${caption}</div>`;
                   }
                   if (cam) {
                     const camStr = encodeURIComponent(JSON.stringify(cam));
@@ -1370,7 +1372,8 @@ function eksporterPDF() {
     filename:     `Modellkontroll_${filnavnFag}_${rensFaseNavn}_${dato}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: 'css', avoid: ['.kategori-panel', '.punkt-container', '.bilde-galleri-item', '#beskrivelsePanel', '.logg-element'] }
   };
 
   setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.');
