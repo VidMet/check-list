@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.8</title>
+  <title>Modellkontroll v4.9</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -117,17 +117,14 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* === PDF Styling (Retter opp fargene!) === */
+    /* PDF Styling */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     
-    /* Beholder opprinnelig farge og border for .aktiv-fase-boks, kun justering av page-break */
     .pdf-mode .aktiv-fase-boks { display: block; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
     
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
-    
-    /* Beholder opprinnelig farge for select-boksen, skjuler kun pilen og justerer marg */
-    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; font-weight: bold; display: inline-block; margin-bottom: 8px; padding: 4px 8px; border-radius: 4px; }
+    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: inline-block; margin-bottom: 8px; border-radius: 4px; }
     .pdf-mode select::-ms-expand { display: none; }
     
     .pdf-mode .fase-tittel { color: var(--ink); margin-bottom: 6px;}
@@ -143,7 +140,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.8</span></h1>
+    <h1>Modellkontroll <span class="version">v4.9</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -650,7 +647,10 @@ async function hentModeller() {
           const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
           list.forEach(m => {
             const id = m.id || m.modelId;
-            const fn = [m.name, m.fileName, m.filename].find(v => /\.ifc/i.test(v));
+            // OPPDATERT: Finner første string, uavhengig av filendelse, som en fallback
+            const fn = [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string' && /\.(ifc|trb|dwg|rvt|skp|tekla|dxf)/i.test(v)) 
+                       || [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string');
+                       
             if (id && fn) {
                 nameMap.set(id, lastPathPart(fn));
                 versionMap.set(id, m.versionId || m.id || 'ukjent');
@@ -676,9 +676,9 @@ async function hentModeller() {
       });
       
     } else {
-      tilgjengeligeModeller = [ {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, {id: 'm2', name: 'E6_Rekkverk.ifc'} ];
+      tilgjengeligeModeller = [ {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, {id: 'm2', name: 'E6_Rekkverk.trb'} ];
       gjeldendeVersjoner['E6_Vegmodell_R761.ifc'] = 'lokal_test_1';
-      gjeldendeVersjoner['E6_Rekkverk.ifc'] = 'lokal_test_2';
+      gjeldendeVersjoner['E6_Rekkverk.trb'] = 'lokal_test_2';
     }
     
     valgteModeller = tilgjengeligeModeller.map(m => m.name);
