@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.6</title>
+  <title>Modellkontroll v4.7</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -47,7 +47,6 @@
     .model-dropdown.show { display: flex; flex-direction: column; gap: 6px; }
     .model-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-family: var(--mono); padding: 4px; border-radius: 4px; border-bottom: 1px solid var(--bg); }
     .model-label:hover { background: var(--bg); }
-    .rev-input { width: 45px; font-size: 10px; font-family: var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; text-align: center; }
     
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
     #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -59,11 +58,6 @@
     .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
     .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
     .summary-table th { background: var(--surface2); font-weight: bold; }
-    
-    .model-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--sans); }
-    .model-summary-table th, .model-summary-table td { border: 1px solid var(--border); padding: 6px; text-align: center; }
-    .model-summary-table th { background: var(--surface2); font-weight: bold; }
-    .model-summary-table td:first-child, .model-summary-table th:first-child { text-align: left; font-family: var(--mono); }
     
     .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
@@ -118,11 +112,11 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* PDF Styling - Oppdatert for å beholde farger! */
+    /* PDF Styling */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     
-    .pdf-mode .aktiv-fase-boks { display: block; padding: 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+    .pdf-mode .aktiv-fase-boks { display: block; padding: 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; border: 1px solid var(--border) !important; background: var(--surface) !important; }
     
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
     .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: block; margin-bottom: 6px; }
@@ -140,7 +134,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.6</span></h1>
+    <h1>Modellkontroll <span class="version">v4.7</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -226,7 +220,7 @@
       <tbody id="sumSignaturer"></tbody>
     </table>
     <div style="margin-top: 20px;">
-      <strong>Sporet filhistorikk for kontrollerte modeller:</strong><br><br>
+      <strong>Sporet filhistorikk for kontrollerte modeller:</strong><br>
       <div id="sumModeller"></div>
     </div>
   </div>
@@ -1285,37 +1279,24 @@ function byggPDFSummary() {
   const fagNavnStr = valgteFag.length > 1 ? 'Flere fag' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Ingen fag');
   $('sumFag').innerText = fagNavnStr;
   
-  let modelHtml = '<table class="model-summary-table"><thead><tr><th>Modellfil</th>';
-  faseRekkefolge.forEach(f => modelHtml += `<th>${f}</th>`);
-  modelHtml += '</tr></thead><tbody>';
-
+  let modelHtml = '<ul style="margin: 4px 0 0 0; padding-left: 20px; line-height: 1.6;">';
   if (Object.keys(modellHistorikk).length > 0) {
      Object.keys(modellHistorikk).forEach(mName => {
          const hist = modellHistorikk[mName];
          if (Object.keys(hist).length > 0) {
-             modelHtml += `<tr><td>${mName}</td>`;
-             let lastVersion = null;
-             faseRekkefolge.forEach(f => {
-                 const thisVersion = hist[f];
-                 if (!thisVersion) {
-                     modelHtml += `<td style="color:var(--muted);">-</td>`;
-                 } else if (!lastVersion) {
-                     modelHtml += `<td style="color:var(--ink); font-weight:bold;">Sjekket</td>`;
-                     lastVersion = thisVersion;
-                 } else if (thisVersion === lastVersion) {
-                     modelHtml += `<td style="color:var(--muted);">Uendret</td>`;
-                 } else {
-                     modelHtml += `<td style="color:var(--blue); font-weight:bold;">Oppdatert</td>`;
-                     lastVersion = thisVersion;
-                 }
+             let sisteRevisjon = 'ukjent';
+             [...faseRekkefolge].reverse().forEach(f => {
+                 if (hist[f] && sisteRevisjon === 'ukjent') sisteRevisjon = hist[f];
              });
-             modelHtml += `</tr>`;
+             if (sisteRevisjon === 'ukjent') sisteRevisjon = '-';
+             
+             modelHtml += `<li><span style="font-family: var(--mono); color: var(--blue); font-weight: bold;">${mName}</span> <span style="color:var(--muted); font-size:11px;">(Siste revisjon: ${sisteRevisjon})</span></li>`;
          }
      });
   } else {
-     modelHtml += `<tr><td colspan="${faseRekkefolge.length + 1}" style="text-align:center; color:var(--muted); font-size:12px; padding:10px;">Ingen modeller registrert</td></tr>`;
+     modelHtml += `<li><i style="color:var(--muted); font-size:12px;">Ingen modeller registrert</i></li>`;
   }
-  modelHtml += '</tbody></table>';
+  modelHtml += '</ul>';
   $('sumModeller').innerHTML = modelHtml;
   
   const tbody = $('sumSignaturer');
@@ -1352,6 +1333,12 @@ function eksporterPDF() {
       else input.removeAttribute('checked');
   });
 
+  const godkjentMsgEl = $('godkjentMessage');
+  const origGodkjentTekst = godkjentMsgEl.innerHTML;
+  if (aktivFase === 'Godkjent') {
+      godkjentMsgEl.innerHTML = '✓ Modeller er godkjent etter modellkontroll i Trimble Connect';
+  }
+
   const container = $('exportContainer');
   container.classList.add('pdf-mode');
   
@@ -1382,6 +1369,9 @@ function eksporterPDF() {
     container.classList.remove('pdf-mode');
     descPanel.classList.remove('hide-empty');
     $('pdfSummary').style.display = 'none';
+    
+    godkjentMsgEl.innerHTML = origGodkjentTekst;
+    
     document.querySelectorAll('.punkt-kommentar').forEach(txt => {
       txt.classList.remove('hide-empty');
       txt.style.height = ''; 
