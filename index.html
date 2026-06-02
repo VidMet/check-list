@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.7</title>
+  <title>Modellkontroll v4.8</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -59,6 +59,11 @@
     .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
     .summary-table th { background: var(--surface2); font-weight: bold; }
     
+    .model-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--sans); }
+    .model-summary-table th, .model-summary-table td { border: 1px solid var(--border); padding: 6px; text-align: center; }
+    .model-summary-table th { background: var(--surface2); font-weight: bold; }
+    .model-summary-table td:first-child, .model-summary-table th:first-child { text-align: left; font-family: var(--mono); }
+    
     .kategori-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; page-break-inside: avoid; }
     .kategori-header { background: var(--surface2); padding: 10px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
     .kategori-header:hover { background: #d1d5db; }
@@ -112,17 +117,21 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* PDF Styling */
+    /* === PDF Styling (Retter opp fargene!) === */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     
-    .pdf-mode .aktiv-fase-boks { display: block; padding: 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; border: 1px solid var(--border) !important; background: var(--surface) !important; }
+    /* Beholder opprinnelig farge og border for .aktiv-fase-boks, kun justering av page-break */
+    .pdf-mode .aktiv-fase-boks { display: block; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
     
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
-    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: block; margin-bottom: 6px; }
+    
+    /* Beholder opprinnelig farge for select-boksen, skjuler kun pilen og justerer marg */
+    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; font-weight: bold; display: inline-block; margin-bottom: 8px; padding: 4px 8px; border-radius: 4px; }
     .pdf-mode select::-ms-expand { display: none; }
-    .pdf-mode .fase-tittel { color: var(--ink); }
-    .pdf-mode .punkt-kommentar { display: block; width: 100%; padding: 0 !important; margin-bottom: 8px; border: none !important; background: transparent !important; font-style: normal; }
+    
+    .pdf-mode .fase-tittel { color: var(--ink); margin-bottom: 6px;}
+    .pdf-mode .punkt-kommentar { display: block; width: 100%; padding: 0 !important; margin-bottom: 8px; border: none !important; background: transparent !important; font-style: normal; resize: none; overflow: hidden; }
     .pdf-mode .bilde-galleri { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; width: 100%; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
     .pdf-mode .bilde-galleri-item { max-width: 48%; page-break-inside: avoid; break-inside: avoid; }
     .pdf-mode #deltakerTabellBody input[type="text"] { border: none; background: transparent; padding: 0; outline: none; color: var(--ink); font-family: var(--sans); }
@@ -134,7 +143,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.7</span></h1>
+    <h1>Modellkontroll <span class="version">v4.8</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
