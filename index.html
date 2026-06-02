@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.4</title>
+  <title>Modellkontroll v4.5</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -109,7 +109,6 @@
     .bilde-galleri-item img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; object-fit: contain; }
     .bilde-galleri-item img:hover { opacity: 0.8; filter: brightness(0.9); }
     
-    /* Nye klasser for bildetekst */
     .bilde-caption-input { width: 100%; font-size: 10px; font-family: var(--sans); padding: 4px; border: 1px dashed var(--border); border-radius: 4px; margin-top: 2px; outline: none; background: var(--surface); color: var(--ink); }
     .bilde-caption-input:focus { border-color: var(--blue); border-style: solid; }
     .caption-pdf-span { display: none; font-size: 10px; font-style: italic; color: var(--muted); margin-top: 4px; text-align: center; width: 100%; word-break: break-word; }
@@ -139,7 +138,7 @@
 
 <header>
   <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.4</span></h1>
+    <h1>Modellkontroll <span class="version">v4.5</span></h1>
     <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
   </div>
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -185,7 +184,7 @@
     <button class="btn" id="modelBtn" onclick="toggleModelDropdown()" disabled>📦 Skann modeller først ▼</button>
     <div id="modelDropdown" class="model-dropdown">
       <label class="model-label" style="font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:4px; justify-content: flex-start;">
-        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModels(this)"> Merk alle i visningen
+        <input type="checkbox" id="checkAllModels" onchange="toggleAlleModeller(this)"> Merk alle i visningen
       </label>
       <div id="modelList">
         <span style="font-size:10px; color:var(--muted);">Trykk "Skann 3D-visning" for å finne modeller.</span>
@@ -1413,36 +1412,21 @@ async function lagreLokalt() {
   const forslattFilnavn = `KS_${filnavnFag}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
 
   try {
-    if (window.showSaveFilePicker) {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: forslattFilnavn,
-        types: [{ description: 'JSON Prosjektfil', accept: {'application/json': ['.json']} }]
-      });
-      const writable = await handle.createWritable();
-      await writable.write(jsonString);
-      await writable.close();
-      
-      $('syncStatus').innerText = `🟢 Lagret (${aktivFase})`;
-      setStatus(`✅ Filen ble lagret til ønsket plassering.`);
-    } else {
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const lenke = document.createElement("a");
-      lenke.href = url;
-      lenke.download = forslattFilnavn;
-      document.body.appendChild(lenke);
-      lenke.click();
-      document.body.removeChild(lenke);
-      URL.revokeObjectURL(url);
-      
-      $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
-      setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
-    }
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const lenke = document.createElement("a");
+    lenke.href = url;
+    lenke.download = forslattFilnavn;
+    document.body.appendChild(lenke);
+    lenke.click();
+    document.body.removeChild(lenke);
+    URL.revokeObjectURL(url);
+    
+    $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
+    setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
   } catch (err) {
-    if (err.name !== 'AbortError') { 
-      console.error(err);
-      alert("En feil oppstod under lagring: " + err.message);
-    }
+    console.error(err);
+    alert("En feil oppstod under lagring: " + err.message);
   }
 }
 
