@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.9</title>
+  <title>Modellkontroll v4.10</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -16,22 +16,40 @@
       --ink: #111827; --muted: #6b7280; --blue: #1d4ed8; --blue-dim: #dbeafe;
       --green: #166534; --green-dim: #dcfce7; --yellow: #ca8a04; --yellow-dim: #fef08a;
       --red: #dc2626; --red-dim: #fee2e2;
+      --ok: #22a06b; --warn: #f79009; --bad: #d92d20;
       --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); height: 100%; display: flex; flex-direction: column; overflow: hidden; min-width: 380px;}
 
-    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .header-info h1 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .header-info h1 .version { font-family: var(--mono); font-size: 11px; font-weight: normal; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
-    .header-info p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+    /* --- NY HEADER STYLING --- */
+    .topbar {
+      height: 92px; background: #fff; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 18px; padding: 10px 18px; flex: 0 0 auto;
+    }
+    .logo-card {
+      width: 145px; height: 68px; border: 1px solid var(--border); border-radius: 12px;
+      background: #fff; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 14px rgba(16,24,40,.08); overflow: hidden; flex-shrink: 0;
+    }
+    .logo-card img { max-width: 128px; max-height: 50px; object-fit: contain; }
+    .app-title { display: flex; flex-direction: column; line-height: 1.2; }
+    .app-title b { font-size: 18px; color: #0050b5; }
+    .app-title span { font-size: 14px; font-weight: 600; }
+    .app-title em { font-size: 12px; color: #667085; font-style: normal; }
     
+    .status { margin-left: auto; display: flex; align-items: center; gap: 7px; color: #667085; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; flex-shrink: 0; }
+    .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.error { background: var(--bad); }
+
     .toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
     .toolbar select, .toolbar input, .btn { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
     .toolbar input { cursor: text; }
     
-    .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; border: 1px solid var(--border); }
+    .btn { font-weight: 600; background: var(--surface2); transition: background 0.2s; border: 1px solid var(--border); white-space: nowrap;}
     .btn:hover:not(:disabled) { background: var(--border); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--blue); color: white; border: none; }
@@ -49,7 +67,8 @@
     .model-label:hover { background: var(--bg); }
     
     #signaturInfo { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; font-size: 12px; font-family: var(--mono); color: var(--ink); flex-wrap: wrap; gap: 10px; }
-    #statusBar { font-family: var(--mono); font-size: 11px; padding: 4px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    
+    /* Fjernet #statusBar da vi nå bruker .status i headeren */
 
     main { flex: 1; overflow-y: auto; padding: 16px; }
 
@@ -117,14 +136,15 @@
     .logg-fase { font-weight: 600; color: var(--blue); }
     .logg-tekst { font-size: 12px; color: var(--ink); white-space: pre-wrap; line-height: 1.5; }
 
-    /* PDF Styling */
+    /* === PDF Styling === */
     .pdf-mode .kamera-btn, .pdf-mode .bcf-btn, .pdf-mode .slett-btn, .pdf-mode .pdf-skjul { display: none !important; }
     .pdf-mode .hide-empty { display: none !important; }
     
     .pdf-mode .aktiv-fase-boks { display: block; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
     
     .pdf-mode .input-rad { display: block; margin-bottom: 6px; }
-    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; background: transparent !important; padding: 0; font-weight: bold; color: var(--ink) !important; display: inline-block; margin-bottom: 8px; border-radius: 4px; }
+    
+    .pdf-mode .status-velger { appearance: none; -webkit-appearance: none; border: none; font-weight: bold; display: inline-block; margin-bottom: 8px; padding: 4px 8px; border-radius: 4px; }
     .pdf-mode select::-ms-expand { display: none; }
     
     .pdf-mode .fase-tittel { color: var(--ink); margin-bottom: 6px;}
@@ -134,20 +154,30 @@
     .pdf-mode #deltakerTabellBody input[type="text"] { border: none; background: transparent; padding: 0; outline: none; color: var(--ink); font-family: var(--sans); }
     .pdf-mode .caption-pdf-span { display: block !important; }
     .pdf-mode .bilde-caption-input { display: none !important; }
+
+    @media(max-width:760px) {
+      .topbar { height: auto; padding: 8px; flex-wrap: wrap; }
+      .logo-card { width: 120px; height: 58px; }
+      .app-title b { font-size: 15px; }
+      .app-title span { font-size: 12px; }
+      .app-title em { display: none; }
+    }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="header-info">
-    <h1>Modellkontroll <span class="version">v4.9</span></h1>
-    <p>Sporing av avvik, tverrfaglig kontroll og godkjenning</p>
+<header class="topbar">
+  <div class="logo-card">
+    <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
-  <div style="display: flex; align-items: center; gap: 10px;">
-    <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
-    <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne eksisterende kontroll</button>
-    <span id="syncStatus" style="font-size:11px; font-family:var(--mono); font-weight:bold; color:var(--muted); margin-right:4px;">Ulagret</span>
-    <button class="btn btn-primary" onclick="lagreLokalt()">💾 Lagre prosjektfil (.json)</button>
+  <div class="app-title">
+    <b>Modellkontroll v4.10</b>
+    <span>Norconsult Norge</span>
+    <em>Developed by Norconsult, AI-assisted development. Kontaktperson: Vidar.Metveit@norconsult.com</em>
+  </div>
+  <div class="status">
+    <span id="statusText">Venter på tilkobling...</span>
+    <span id="statusDot" class="dot"></span>
   </div>
 </header>
 
@@ -204,11 +234,12 @@
   
   <div style="border-left: 1px solid var(--border); height: 24px; margin: 0 5px;"></div>
   
-  <button class="btn btn-secondary" onclick="eksporterPDF()">📄 Eksporter til PDF</button>
+  <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
+  <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
+  <button class="btn btn-primary" onclick="lagreLokalt()">💾 Lagre fil (.json)</button>
 </div>
 
 <div id="signaturInfo"></div>
-<div id="statusBar">Venter på tilkobling...</div>
 
 <main id="exportContainer">
   <div id="pdfSummary">
@@ -307,7 +338,14 @@ let gjeldendeVersjoner = {};
 let deltakere = []; 
 
 const $ = id => document.getElementById(id);
-const setStatus = m => { $('statusBar').textContent = m; };
+const setStatus = (m, c='') => { 
+    $('statusText').textContent = m; 
+    let dotClass = 'dot';
+    if (c === 'ok') dotClass = 'dot live';
+    else if (c === 'error') dotClass = 'dot error';
+    else if (c === 'warn') dotClass = 'dot warn';
+    $('statusDot').className = dotClass; 
+};
 const lastPathPart = (v) => (v || '').split('/').pop().split('\\').pop();
 
 window.gaTilKameraState = async function(camStr) {
@@ -323,7 +361,7 @@ window.gaTilKameraState = async function(camStr) {
 
 $('beskrivelseTekst').addEventListener('input', (e) => {
   beskrivelseData.tekst = e.target.value;
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus('🟠 Ulagrede endringer', 'warn');
 });
 
 function toggleOppsummering() {
@@ -352,9 +390,9 @@ function toggleTommePunkter() {
 async function init() {
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
-    setStatus('✅ Tilkoblet Trimble Connect Workspace API');
+    setStatus('✅ Tilkoblet Trimble Connect Workspace API', 'ok');
   } catch(e) {
-    setStatus('⚠️ Kjører frittstående (Utenfor Trimble 3D-visning)');
+    setStatus('⚠️ Kjører frittstående (Utenfor Trimble)', 'warn');
   }
   
   try {
@@ -380,7 +418,7 @@ async function init() {
       tegnKategorier();
     }
   } catch(e) {
-    setStatus('❌ Kunne ikke laste sjekklister.json.');
+    setStatus('❌ Kunne ikke laste sjekklister.json.', 'error');
   }
 }
 
@@ -403,16 +441,16 @@ function tegnDeltakere() {
 window.leggTilDeltaker = function() {
     deltakere.push({navn: '', fag: '', tilStede: false, kopi: false});
     tegnDeltakere();
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus('🟠 Ulagrede endringer', 'warn');
 };
 window.oppdaterDeltaker = function(index, felt, verdi) {
     deltakere[index][felt] = verdi;
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus('🟠 Ulagrede endringer', 'warn');
 };
 window.slettDeltaker = function(index) {
     deltakere.splice(index, 1);
     tegnDeltakere();
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus('🟠 Ulagrede endringer', 'warn');
 };
 
 function toggleFagDropdown() { $('fagDropdown').classList.toggle('show'); }
@@ -468,7 +506,7 @@ document.addEventListener('paste', (e) => {
   } else if (activeEl && activeEl.id === 'beskrivelseTekst') {
     isBeskrivelse = true;
   } else {
-    setStatus("⚠️ Klikk inni et kommentarfelt før du trykker Ctrl+V for å lime inn et skjermbilde.");
+    setStatus("⚠️ Klikk inni et kommentarfelt før du trykker Ctrl+V for å lime inn et skjermbilde.", 'warn');
     return;
   }
 
@@ -491,13 +529,11 @@ document.addEventListener('paste', (e) => {
     if (isBeskrivelse) {
       beskrivelseData.bilder.push(imgData);
       oppdaterBeskrivelseGalleriUI();
-      $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      setStatus('📋 Skjermbilde limt inn i generell beskrivelse.');
+      setStatus('📋 Skjermbilde limt inn i generell beskrivelse.', 'ok');
     } else if (targetPunktId) {
       ksData[targetPunktId][aktivFase].bilder.push(imgData);
       oppdaterGalleriUI(targetPunktId);
-      $('syncStatus').innerText = '🟠 Ulagrede endringer';
-      setStatus(`📋 Skjermbilde limt inn under ${aktivFase}.`);
+      setStatus(`📋 Skjermbilde limt inn under ${aktivFase}.`, 'ok');
     }
   };
   
@@ -529,7 +565,7 @@ async function taBildeBeskrivelse() {
     
     beskrivelseData.bilder.push({ src: base64, camera: cameraState, caption: '' });
     oppdaterBeskrivelseGalleriUI();
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
+    setStatus('🟠 Ulagrede endringer', 'warn');
   } catch (e) {
     alert("Kunne ikke ta bilde: " + e.message);
   }
@@ -553,7 +589,7 @@ function oppdaterBeskrivelseGalleriUI() {
       if(confirm("Vil du slette dette bildet fra beskrivelsen?")) {
         beskrivelseData.bilder.splice(imgIndex, 1);
         oppdaterBeskrivelseGalleriUI();
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        setStatus('🟠 Ulagrede endringer', 'warn');
       }
     };
     wrapper.appendChild(img);
@@ -566,7 +602,7 @@ function oppdaterBeskrivelseGalleriUI() {
     capInput.oninput = (e) => {
         beskrivelseData.bilder[imgIndex].caption = e.target.value;
         capSpan.innerText = e.target.value;
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        setStatus('🟠 Ulagrede endringer', 'warn');
     };
     wrapper.appendChild(capInput);
     
@@ -604,7 +640,7 @@ function leggTilLogg() {
   
   $('nyOppsummeringTekst').value = '';
   oppdaterOppsummeringUI();
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus('🟠 Ulagrede endringer', 'warn');
 }
 
 function oppdaterOppsummeringUI() {
@@ -647,7 +683,6 @@ async function hentModeller() {
           const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
           list.forEach(m => {
             const id = m.id || m.modelId;
-            // OPPDATERT: Finner første string, uavhengig av filendelse, som en fallback
             const fn = [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string' && /\.(ifc|trb|dwg|rvt|skp|tekla|dxf)/i.test(v)) 
                        || [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string');
                        
@@ -744,7 +779,7 @@ function oppdaterValgteModeller() {
   });
 
   $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus('🟠 Ulagrede endringer', 'warn');
 }
 
 document.addEventListener('click', (e) => {
@@ -848,13 +883,12 @@ async function opprettBCF(punktId) {
     viewData = data.bilder[0]; 
   }
 
-  $('syncStatus').innerText = '⏳ Oppretter BCF...';
+  setStatus('⏳ Oppretter BCF...', 'warn');
 
   try {
     console.log("== BCF / ToDo DATA KLARGJORT (Simulering) ==", { Tittel: tittel, Beskrivelse: beskrivelse, View: viewData });
     setTimeout(() => {
-      setStatus(`✅ BCF / ToDo simulert for punktet.`);
-      $('syncStatus').innerText = '🟠 Ulagrede endringer';
+      setStatus(`✅ BCF / ToDo simulert for punktet.`, 'ok');
       
       const btn = $(`bcfBtn_${punktId}`);
       if(btn) {
@@ -903,7 +937,7 @@ function leggTilFrittPunkt(fagKeyOverride) {
   
   openCategories.add(valgteFag.length > 1 ? `${strukturData[targetFag].navn} - Egendefinerte kontrollpunkter` : "Egendefinerte kontrollpunkter");
   tegnKategorier();
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus('🟠 Ulagrede endringer', 'warn');
   setTimeout(() => { $('exportContainer').scrollTop = $('exportContainer').scrollHeight; }, 100);
 }
 
@@ -921,7 +955,7 @@ function slettFrittPunkt(punktId) {
   }
   delete ksData[punktId];
   tegnKategorier();
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
+  setStatus('🟠 Ulagrede endringer', 'warn');
 }
 
 function getStatusFormat(kode) {
@@ -1091,13 +1125,13 @@ function tegnKategorier() {
             sel.addEventListener('change', (e) => {
               ksData[pkt.id][aktivFase].status = e.target.value;
               oppdaterFargeOgStil();
-              $('syncStatus').innerText = '🟠 Ulagrede endringer';
+              setStatus('🟠 Ulagrede endringer', 'warn');
             });
             
             kom.addEventListener('input', (e) => {
               ksData[pkt.id][aktivFase].kommentar = e.target.value;
               oppdaterFargeOgStil();
-              $('syncStatus').innerText = '🟠 Ulagrede endringer';
+              setStatus('🟠 Ulagrede endringer', 'warn');
             });
             oppdaterFargeOgStil();
           }, 0);
@@ -1195,8 +1229,7 @@ async function taBilde(punktId) {
     
     ksData[punktId][aktivFase].bilder.push({ src: base64, camera: cameraState, caption: '' });
     oppdaterGalleriUI(punktId);
-    $('syncStatus').innerText = '🟠 Ulagrede endringer';
-    setStatus(`📷 Bilde lagt til under ${aktivFase}.`);
+    setStatus('🟠 Ulagrede endringer', 'warn');
   } catch (e) { alert("Kunne ikke ta bilde. Feilmelding: " + e.message); }
 }
 
@@ -1221,7 +1254,7 @@ function oppdaterGalleriUI(punktId) {
       if(aktivFase !== 'Godkjent' && confirm("Vil du slette dette bildet?")) {
         ksData[punktId][aktivFase].bilder.splice(imgIndex, 1);
         oppdaterGalleriUI(punktId);
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        setStatus('🟠 Ulagrede endringer', 'warn');
       }
     };
     wrapper.appendChild(img);
@@ -1234,7 +1267,7 @@ function oppdaterGalleriUI(punktId) {
     capInput.oninput = (e) => {
         ksData[punktId][aktivFase].bilder[imgIndex].caption = e.target.value;
         capSpan.innerText = e.target.value;
-        $('syncStatus').innerText = '🟠 Ulagrede endringer';
+        setStatus('🟠 Ulagrede endringer', 'warn');
     };
     wrapper.appendChild(capInput);
     
@@ -1265,8 +1298,7 @@ function signerFase() {
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   signaturData[aktivFase] = { initialer: initialer, dato: dato };
   oppdaterSignaturVisning();
-  $('syncStatus').innerText = '🟠 Ulagrede endringer';
-  setStatus(`✍️ Signert for fasen: ${aktivFase}.`);
+  setStatus(`✍️ Signert for fasen: ${aktivFase}.`, 'ok');
 }
 
 function oppdaterSignaturVisning() {
@@ -1372,7 +1404,7 @@ function eksporterPDF() {
     pagebreak:    { mode: 'css', avoid: ['.kategori-panel', '.punkt-container', '.bilde-galleri-item', '#beskrivelsePanel', '.logg-element'] }
   };
 
-  setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.');
+  setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.', 'warn');
   
   html2pdf().set(opt).from(container).save().then(() => {
     container.classList.remove('pdf-mode');
@@ -1385,7 +1417,7 @@ function eksporterPDF() {
       txt.classList.remove('hide-empty');
       txt.style.height = ''; 
     });
-    setStatus('✅ PDF generert og lagt i nedlastinger.');
+    setStatus('✅ PDF generert og lagt i nedlastinger.', 'ok');
   });
 }
 
@@ -1424,8 +1456,7 @@ async function lagreLokalt() {
     document.body.removeChild(lenke);
     URL.revokeObjectURL(url);
     
-    $('syncStatus').innerText = `🟢 Lagret lokalt (${aktivFase})`;
-    setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`);
+    setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`, 'ok');
   } catch (err) {
     console.error(err);
     alert("En feil oppstod under lagring: " + err.message);
@@ -1495,8 +1526,7 @@ function lastInnFil(event) {
       oppdaterSignaturVisning();
       byttFase(aktivFase); 
       
-      $('syncStatus').innerText = '🟢 Fil lastet inn';
-      setStatus(`✅ Vellykket innlasting av fil: ${file.name}`);
+      setStatus(`✅ Vellykket innlasting av fil: ${file.name}`, 'ok');
       
       event.target.value = ''; 
     } catch (err) {
