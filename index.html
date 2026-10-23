@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.11-preview.2</title>
+  <title>Modellkontroll v4.11-preview.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.11-preview.2</b>
+    <b>Modellkontroll v4.11-preview.3</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -237,16 +237,18 @@
   <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
   <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
-  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.2. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
+  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.3. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
 <dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
   <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
-  <p style="margin:12px 0;">Preview.2 leser prosjektkontekst og analyserer eksporten. Autentisering testes bare med egen knapp og kan vise en tillatelsesdialog. Ingen filer lastes opp. Token vises eller lagres ikke.</p>
+  <p style="margin:12px 0;">Preview.3 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
+  <section style="margin:12px 0;"><p id="trimbleFolderPath"></p><div id="trimbleFolderList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;"></div><button class="btn" id="trimbleSelectFolderBtn" disabled onclick="velgTrimbleKontrollmappe()">Velg vist mappe som kontrollmappe (kun test)</button><p id="trimbleReadStatus" role="status"></p></section>
   <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+    <button class="btn" id="trimbleReadBtn" onclick="testTrimbleLesetilgang()">Test lesetilgang og vis mapper</button>
     <button class="btn" id="trimbleAuthBtn" onclick="testTrimbleAutentisering()">Test autentisering (be om tilgang)</button>
     <button class="btn" onclick="kopierTrimbleDiagnostikk()">Kopier diagnostikk</button>
     <button class="btn" onclick="document.getElementById('trimbleDiagnosticDialog').close()">Lukk</button>
@@ -329,7 +331,7 @@
 </main>
 
 <script>
-const APP_VERSION = '4.11-preview.2';
+const APP_VERSION = '4.11-preview.3';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -1494,7 +1496,7 @@ function hentTrimbleApiDiagnostikk() {
 }
 
 // Kilder: Workspace API ProjectAPI.getProject og ExtensionAPI.requestPermission.
-// Ingen tokenverdier beholdes i applikasjonstilstand, eksport, rapport eller konsoll.
+// Token beholdes kun i lukket minne i opptil fem minutter. Aldri i eksport/rapport/konsoll.
 let trimbleRapport = null;
 let trimbleAuthStatus = { state: 'notRequested', tokenCandidateObserved: false, tokenValidated: false };
 let trimbleAuthAttempt = 0;
@@ -1521,6 +1523,7 @@ function klassifiserTrimbleAuth(verdi, kilde) {
 function handterTrimbleDiagnostikkEvent(event, args) {
   if (event !== 'extension.accessToken' || trimbleAuthAttempt === 0) return;
   trimbleAuthStatus = klassifiserTrimbleAuth(args?.data, 'extension.accessToken');
+  trimbleTokenMinne.motta(args?.data);
   if (trimbleRapport) {
     trimbleRapport.authentication = { ...trimbleAuthStatus };
     visTrimbleRapport();
@@ -1606,6 +1609,7 @@ async function testTrimbleAutentisering() {
       const resultat = await medDiagnostikkTidsgrense(() => API.extension.requestPermission('accesstoken'));
       if (attempt === trimbleAuthAttempt && !trimbleAuthStatus.tokenCandidateObserved) {
         trimbleAuthStatus = klassifiserTrimbleAuth(resultat, 'requestPermission');
+        trimbleTokenMinne.motta(resultat);
       }
     }
   } catch (err) {
@@ -1617,6 +1621,171 @@ async function testTrimbleAutentisering() {
     $('trimbleDiagnosticCopyStatus').textContent = 'Autentiseringsstatus oppdatert. Ingen tokenverdi er med i rapporten. Ingen fil er lastet opp.';
     btn.disabled = false;
   }
+}
+
+
+// API 2.0: https://developer.trimble.com/docs/connect/reference/openapi/core/
+// Eksplisitt begrenset til dokumentert EU-vert og GET-endepunktene nedenfor.
+const trimbleTokenMinne = (() => {
+  let token = null, timer = null;
+  return {
+    motta(verdi) {
+      const klassifisert = klassifiserTrimbleAuth(verdi, 'memory');
+      if (!klassifisert.tokenCandidateObserved) return;
+      token = (typeof verdi === 'string' ? verdi : verdi.accessToken).trim();
+      clearTimeout(timer);
+      timer = setTimeout(() => { token = null; }, 300000);
+    },
+    hent() { return token; },
+    slett() { token = null; clearTimeout(timer); }
+  };
+})();
+let trimbleLesekontekst = null;
+let trimbleLeser = false;
+
+async function trimbleKunGet(base, sti, range) {
+  if (base !== 'https://app21.connect.trimble.com/tc/api/2.0') throw new Error('UNSUPPORTED_REGION');
+  if (!/^\/projects\/[A-Za-z0-9_-]+$/.test(sti) && !/^\/folders\/[A-Za-z0-9_-]+\/items$/.test(sti)) throw new Error('BLOCKED_PATH');
+  const token = trimbleTokenMinne.hent();
+  if (!token) throw new Error('TOKEN_MISSING');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const headers = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
+    if (range) headers.Range = range;
+    const response = await fetch(base + sti, { method: 'GET', headers,
+      signal: controller.signal, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer' });
+    if (trimbleRapport?.readOnlyTest) trimbleRapport.readOnlyTest.requests.push({ method: 'GET', path: sti, status: response.status });
+    if (!response.ok) {
+      if (response.status === 401) trimbleTokenMinne.slett();
+      throw new Error('HTTP_' + response.status);
+    }
+    return { data: await response.json(), status: response.status, range: response.headers.get('Content-Range') };
+  } finally { clearTimeout(timer); }
+}
+
+function trimbleTryggFeilkode(err) {
+  const kode = err?.message;
+  if (/^(HTTP_\d{3}|UNSUPPORTED_REGION|BLOCKED_PATH|TOKEN_MISSING|TOKEN_TIMEOUT|PROJECT_CHANGED|ROOT_ID_MISSING|UNRECOGNIZED_FOLDER_RESPONSE|PAGINATION_UNVERIFIED|PAGE_LIMIT)$/.test(kode || '')) return kode;
+  return err?.name === 'AbortError' ? 'REQUEST_TIMEOUT' : 'NETWORK_CORS_OR_RESPONSE_ERROR';
+}
+
+async function trimbleHentTokenForLesing() {
+  if (trimbleTokenMinne.hent()) return;
+  await testTrimbleAutentisering();
+  const start = Date.now();
+  while (!trimbleTokenMinne.hent() && Date.now() - start < 20000) {
+    if (['denied','failed','cancelled','canceled','unavailable'].includes(trimbleAuthStatus.state)) throw new Error('TOKEN_MISSING');
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  if (!trimbleTokenMinne.hent()) throw new Error('TOKEN_TIMEOUT');
+}
+
+async function testTrimbleLesetilgang() {
+  if (trimbleLeser) return;
+  trimbleLeser = true;
+  $('trimbleReadBtn').disabled = true;
+  $('trimbleSelectFolderBtn').disabled = true;
+  $('trimbleFolderList').replaceChildren();
+  $('trimbleFolderPath').textContent = '';
+  trimbleLesekontekst = null;
+  try {
+    if (!trimbleRapport) trimbleRapport = hentTrimbleApiDiagnostikk();
+    trimbleRapport.readOnlyTest = { state: 'running', writeRequests: 0, requests: [], writePermissionTested: false };
+    trimbleRapport.selectedControlFolder = null;
+    $('trimbleReadStatus').textContent = 'Ber om tilgang og leser prosjekt. Ingen skriving.';
+    visTrimbleRapport();
+    const prosjekt = await medDiagnostikkTidsgrense(() => API.project.getProject());
+    if (prosjekt?.location !== 'europe') throw new Error('UNSUPPORTED_REGION');
+    if (!/^[A-Za-z0-9_-]+$/.test(prosjekt?.id || '')) throw new Error('PROJECT_CHANGED');
+    await trimbleHentTokenForLesing();
+    const base = 'https://app21.connect.trimble.com/tc/api/2.0';
+    const svar = await trimbleKunGet(base, '/projects/' + encodeURIComponent(prosjekt.id));
+    if (svar.data?.id !== prosjekt.id) throw new Error('PROJECT_CHANGED');
+    trimbleAuthStatus = { ...trimbleAuthStatus, tokenValidated: true, validatedBy: 'GET project, matching project ID' };
+    trimbleRapport.authentication = { ...trimbleAuthStatus };
+    trimbleRapport.project = { state: 'received', id: prosjekt.id, location: prosjekt.location };
+    // Tolerant lesing av eksplisitte ID-felt, aldri gjetting av rot-ID fra prosjektnavn.
+    const rootId = svar.data.rootId || svar.data.rootFolderId || svar.data.rootFolder?.id;
+    if (typeof rootId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(rootId)) {
+      trimbleRapport.readOnlyTest.projectResponseKeys = Object.keys(svar.data || {}).filter(k => !/token|secret|auth/i.test(k));
+      throw new Error('ROOT_ID_MISSING');
+    }
+    trimbleLesekontekst = { projectId: prosjekt.id, base, trail: [{ id: rootId, name: 'Prosjektrot' }] };
+    await trimbleVisMappe();
+    trimbleRapport.readOnlyTest.state = 'passed';
+    $('trimbleReadStatus').textContent = 'Lesetilgang bekreftet. Bla i mapper og velg kontrollmappe for testen. Skriverettigheter er ikke testet.';
+  } catch (err) {
+    if (trimbleRapport?.readOnlyTest) { trimbleRapport.readOnlyTest.state = 'failed'; trimbleRapport.readOnlyTest.error = trimbleTryggFeilkode(err); }
+    $('trimbleReadStatus').textContent = 'Lesetest stoppet: ' + trimbleTryggFeilkode(err) + '. Ingen data er endret.';
+  } finally {
+    trimbleLeser = false;
+    $('trimbleReadBtn').disabled = false;
+    visTrimbleRapport();
+  }
+}
+
+async function trimbleVisMappe() {
+  const ctx = trimbleLesekontekst;
+  $('trimbleSelectFolderBtn').disabled = true;
+  $('trimbleFolderList').replaceChildren();
+  const prosjekt = await medDiagnostikkTidsgrense(() => API.project.getProject());
+  if (prosjekt?.id !== ctx.projectId) { trimbleLesekontekst = null; throw new Error('PROJECT_CHANGED'); }
+  const mappe = ctx.trail[ctx.trail.length - 1];
+  const mapper = [];
+  let komplett = false, itemCount = 0;
+  for (let page = 0; page < 20; page++) {
+    const start = page * 200;
+    const svar = await trimbleKunGet(ctx.base, '/folders/' + encodeURIComponent(mappe.id) + '/items', 'items=' + start + '-' + (start + 199));
+    const items = Array.isArray(svar.data) ? svar.data : (Array.isArray(svar.data?.items) ? svar.data.items : null);
+    if (!items) throw new Error('UNRECOGNIZED_FOLDER_RESPONSE');
+    itemCount += items.length;
+    for (const item of items) {
+      if (String(item.type).toUpperCase() === 'FOLDER' && typeof item.id === 'string' && /^[A-Za-z0-9_-]+$/.test(item.id)) mapper.push({ id: item.id, name: typeof item.name === 'string' ? item.name : item.id });
+    }
+    if (svar.status === 200) { komplett = true; break; }
+    const range = /^items\s+(\d+)-(\d+)\/(\d+|\*)$/i.exec(svar.range || '');
+    if (!range || Number(range[1]) !== start) throw new Error('PAGINATION_UNVERIFIED');
+    if (range[3] !== '*' && Number(range[2]) + 1 >= Number(range[3])) { komplett = true; break; }
+    if (Number(range[2]) !== start + 199) throw new Error('PAGINATION_UNVERIFIED');
+  }
+  if (!komplett) throw new Error('PAGE_LIMIT');
+  const liste = $('trimbleFolderList');
+  const add = (tekst, fn) => { const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = tekst; btn.onclick = fn; liste.appendChild(btn); };
+  if (ctx.trail.length > 1) add('Til overordnet mappe', () => trimbleNavigerMappe(null));
+  for (const folder of mapper.sort((a,b) => a.name.localeCompare(b.name, 'nb'))) add(folder.name, () => trimbleNavigerMappe(folder));
+  $('trimbleFolderPath').textContent = ctx.trail.map(f => f.name).join(' / ');
+  trimbleRapport.readOnlyTest.currentFolder = { id: mappe.id, path: ctx.trail.map(f => f.name).join('/'), folderCount: mapper.length, itemCount, listingComplete: true };
+  $('trimbleSelectFolderBtn').disabled = false;
+  visTrimbleRapport();
+}
+
+async function trimbleNavigerMappe(folder) {
+  if (trimbleLeser || !trimbleLesekontekst) return;
+  trimbleLeser = true;
+  $('trimbleReadBtn').disabled = true;
+  const trail = trimbleLesekontekst.trail.slice();
+  if (folder) trimbleLesekontekst.trail.push(folder); else trimbleLesekontekst.trail.pop();
+  try { await trimbleVisMappe(); $('trimbleReadStatus').textContent = 'Mappe lest. Ingen data endret.'; }
+  catch (err) {
+    if (trimbleLesekontekst) trimbleLesekontekst.trail = trail;
+    trimbleRapport.readOnlyTest.lastNavigationError = trimbleTryggFeilkode(err);
+    $('trimbleReadStatus').textContent = 'Kunne ikke lese mappe: ' + trimbleTryggFeilkode(err);
+  } finally { trimbleLeser = false; $('trimbleReadBtn').disabled = false; visTrimbleRapport(); }
+}
+
+async function velgTrimbleKontrollmappe() {
+  if (trimbleLeser || !trimbleLesekontekst || $('trimbleSelectFolderBtn').disabled) return;
+  try {
+    const ctx = trimbleLesekontekst;
+    const prosjekt = await medDiagnostikkTidsgrense(() => API.project.getProject());
+    if (prosjekt?.id !== ctx.projectId) throw new Error('PROJECT_CHANGED');
+    const folder = ctx.trail[ctx.trail.length - 1];
+    trimbleRapport.selectedControlFolder = { projectId: ctx.projectId, folderId: folder.id,
+      path: ctx.trail.map(f => f.name).join('/'), persisted: false, writePermissionVerified: false };
+    visTrimbleRapport();
+    $('trimbleReadStatus').textContent = 'Kontrollmappe valgt for denne testen. Ikke lagret i prosjektet eller eksporten.';
+  } catch (_) { $('trimbleSelectFolderBtn').disabled = true; $('trimbleReadStatus').textContent = 'Prosjekt kunne ikke bekreftes. Kjoer lesetesten paa nytt.'; }
 }
 
 async function kopierTrimbleDiagnostikk() {
