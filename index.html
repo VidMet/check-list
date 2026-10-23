@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.11-preview.1</title>
+  <title>Modellkontroll v4.11-preview.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.11-preview.1</b>
+    <b>Modellkontroll v4.11-preview.2</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -237,16 +237,17 @@
   <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
   <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
-  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.1. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
+  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.2. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
 <dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
   <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
-  <p style="margin:12px 0;">Preview.1 klargjør JSON og viser API-diagnostikk. Ingen fil er lastet opp eller lagret i Trimble Connect. Tomme metodelister beviser ikke at et API mangler.</p>
+  <p style="margin:12px 0;">Preview.2 leser prosjektkontekst og analyserer eksporten. Autentisering testes bare med egen knapp og kan vise en tillatelsesdialog. Ingen filer lastes opp. Token vises eller lagres ikke.</p>
   <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+    <button class="btn" id="trimbleAuthBtn" onclick="testTrimbleAutentisering()">Test autentisering (be om tilgang)</button>
     <button class="btn" onclick="kopierTrimbleDiagnostikk()">Kopier diagnostikk</button>
     <button class="btn" onclick="document.getElementById('trimbleDiagnosticDialog').close()">Lukk</button>
   </div>
@@ -328,7 +329,7 @@
 </main>
 
 <script>
-const APP_VERSION = '4.11-preview.1';
+const APP_VERSION = '4.11-preview.2';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -401,7 +402,7 @@ function toggleTommePunkter() {
 
 async function init() {
   try {
-    API = await window.TrimbleConnectWorkspace.connect(window.parent);
+    API = await window.TrimbleConnectWorkspace.connect(window.parent, handterTrimbleDiagnostikkEvent);
     setStatus('✅ Tilkoblet Trimble Connect Workspace API', 'ok');
   } catch(e) {
     setStatus('⚠️ Kjører frittstående (Utenfor Trimble)', 'warn');
@@ -1475,7 +1476,7 @@ function hentTrimbleApiDiagnostikk() {
     apiAvailable: !!API,
     uploadImplemented: false,
     uploaded: false,
-    note: 'Kun lokale observasjoner. Ingen API-metoder kalles. Tomme lister kan skyldes proxy eller ikke-enumererbare metoder.',
+    note: 'Prosjekt leses med getProject. Autentisering krever eget knappetrykk. Ingen opplasting eller REST-kall. Tomme metodelister beviser ikke manglende API.',
     namespaces: {}
   };
   for (const navn of ['project', 'files', 'extension', 'user']) {
@@ -1492,35 +1493,129 @@ function hentTrimbleApiDiagnostikk() {
   return rapport;
 }
 
+// Kilder: Workspace API ProjectAPI.getProject og ExtensionAPI.requestPermission.
+// Ingen tokenverdier beholdes i applikasjonstilstand, eksport, rapport eller konsoll.
+let trimbleRapport = null;
+let trimbleAuthStatus = { state: 'notRequested', tokenCandidateObserved: false, tokenValidated: false };
+let trimbleAuthAttempt = 0;
+
+function medDiagnostikkTidsgrense(oppgave, ms = 12000) {
+  let timer;
+  return Promise.race([
+    Promise.resolve().then(oppgave),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('DIAGNOSTIC_TIMEOUT')), ms); })
+  ]).finally(() => clearTimeout(timer));
+}
+
+function klassifiserTrimbleAuth(verdi, kilde) {
+  const raw = typeof verdi === 'string' ? verdi :
+    (typeof verdi?.accessToken === 'string' ? verdi.accessToken : null);
+  const status = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  const kjent = ['pending', 'denied', 'granted', 'cancelled', 'canceled', 'unauthorized', 'error'];
+  // Kandidat betyr bare at en token-lignende streng ble observert, ikke at den virker.
+  const kandidat = !!raw && !kjent.includes(status) && raw.length > 80 && !/\s/.test(raw);
+  return { state: kandidat ? 'tokenCandidateReceived' : (kjent.includes(status) ? status : 'unrecognizedResponse'),
+    source: kilde, tokenCandidateObserved: kandidat, tokenValidated: false };
+}
+
+function handterTrimbleDiagnostikkEvent(event, args) {
+  if (event !== 'extension.accessToken' || trimbleAuthAttempt === 0) return;
+  trimbleAuthStatus = klassifiserTrimbleAuth(args?.data, 'extension.accessToken');
+  if (trimbleRapport) {
+    trimbleRapport.authentication = { ...trimbleAuthStatus };
+    visTrimbleRapport();
+  }
+}
+
+function visTrimbleRapport() {
+  if (!trimbleRapport) return;
+  $('trimbleDiagnosticText').value = JSON.stringify(trimbleRapport, null, 2);
+}
+
+function analyserEksportForPublisering(eksport) {
+  const modeller = eksport.data.metadata.modeller;
+  const antall = Array.isArray(modeller) ? modeller.length : 0;
+  const idAntall = Array.isArray(modeller) ? modeller.filter(m => m && typeof m === 'object' &&
+    (typeof m.modelId === 'string' || typeof m.fileId === 'string')).length : 0;
+  const varsler = [];
+  if (!antall) varsler.push('Ingen modeller valgt. Publisering skal blokkeres inntil modellkobling er avklart.');
+  if (antall && idAntall !== antall) varsler.push('Eksporten mangler eksplisitt modelId/fileId for en eller flere modeller. Navn alene er ikke en stabil DocLib-kobling.');
+  const bytes = v => new Blob([JSON.stringify(v, null, 2)]).size;
+  return { filename: eksport.filnavn, bytes: eksport.blob.size, modelCount: antall,
+    modelsWithExplicitId: idAntall, formatVersion: eksport.data.metadata.formatVersion,
+    sectionBytes: { metadata: bytes(eksport.data.metadata), kontrollData: bytes(eksport.data.kontrollData),
+      strukturDataEndringer: bytes(eksport.data.strukturDataEndringer) },
+    sectionBytesNote: 'Hver seksjon serialiseres separat. Summen er ikke identisk med total filst\u00f8rrelse.',
+    modelLinkCheckPassed: antall > 0 && idAntall === antall,
+    publicationReady: false, warnings: varsler };
+}
+
 async function lagreTilTrimbleConnect() {
   const btn = $('trimbleSaveBtn');
   if (btn.disabled) return;
-  const opprinneligTekst = btn.textContent;
+  const tekst = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Klargjør diagnostikk...';
+  btn.textContent = 'Leser prosjekt...';
   try {
     if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
-    if (!validerAktivFase()) return;
+    // Diagnostikk skal ogsaa kunne kjoeres uten signert/ferdig kontroll.
     const eksport = klargjorJsonEksport();
-    const rapport = hentTrimbleApiDiagnostikk();
-    rapport.export = {
-      filename: eksport.filnavn,
-      bytes: eksport.blob.size,
-      modelCount: eksport.data.metadata.modeller.length,
-      formatVersion: eksport.data.metadata.formatVersion
-    };
-    $('trimbleDiagnosticText').value = JSON.stringify(rapport, null, 2);
+    trimbleRapport = hentTrimbleApiDiagnostikk();
+    trimbleRapport.export = analyserEksportForPublisering(eksport);
+    trimbleRapport.authentication = { ...trimbleAuthStatus };
+    trimbleRapport.uploadRoute = { implemented: false, endpointVerified: false,
+      reason: 'REST-opplasting, region, mappe og rettigheter er ikke verifisert i denne versjonen.' };
+    trimbleRapport.project = { state: 'reading' };
+    visTrimbleRapport();
     $('trimbleDiagnosticCopyStatus').textContent = '';
     const dialog = $('trimbleDiagnosticDialog');
     if (!dialog.open) dialog.showModal();
-    console.info('[Modellkontroll ' + APP_VERSION + '] Diagnostikk, ingen opplasting:', rapport);
-    setStatus('Kun diagnostikk. Ingen fil er lagret i Trimble Connect.', 'warn');
-  } catch (err) {
-    console.error('[Modellkontroll] Diagnostikk feilet:', err);
+    if (!API?.project || typeof API.project.getProject !== 'function') {
+      trimbleRapport.project = { state: 'unavailable' };
+    } else {
+      try {
+        const prosjekt = await medDiagnostikkTidsgrense(() => API.project.getProject());
+        trimbleRapport.project = { state: prosjekt?.id ? 'received' : 'missingId',
+          id: typeof prosjekt?.id === 'string' ? prosjekt.id : null,
+          location: typeof prosjekt?.location === 'string' ? prosjekt.location : null };
+      } catch (err) {
+        trimbleRapport.project = { state: err?.message === 'DIAGNOSTIC_TIMEOUT' ? 'timeout' : 'failed' };
+      }
+    }
+    visTrimbleRapport();
+    setStatus('Diagnostikk klar. Ingen fil er lagret i Trimble Connect.', 'warn');
+  } catch (_) {
     setStatus('Diagnostikk feilet. Ingen fil er lastet opp.', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = opprinneligTekst;
+    btn.textContent = tekst;
+  }
+}
+
+async function testTrimbleAutentisering() {
+  const btn = $('trimbleAuthBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const attempt = ++trimbleAuthAttempt;
+  trimbleAuthStatus = { state: 'requesting', tokenCandidateObserved: false, tokenValidated: false };
+  if (trimbleRapport) { trimbleRapport.authentication = { ...trimbleAuthStatus }; visTrimbleRapport(); }
+  try {
+    if (!API?.extension || typeof API.extension.requestPermission !== 'function') {
+      trimbleAuthStatus = { state: 'unavailable', tokenCandidateObserved: false, tokenValidated: false };
+    } else {
+      const resultat = await medDiagnostikkTidsgrense(() => API.extension.requestPermission('accesstoken'));
+      if (attempt === trimbleAuthAttempt && !trimbleAuthStatus.tokenCandidateObserved) {
+        trimbleAuthStatus = klassifiserTrimbleAuth(resultat, 'requestPermission');
+      }
+    }
+  } catch (err) {
+    if (!trimbleAuthStatus.tokenCandidateObserved) trimbleAuthStatus = {
+      state: err?.message === 'DIAGNOSTIC_TIMEOUT' ? 'timeout' : 'failed',
+      tokenCandidateObserved: false, tokenValidated: false };
+  } finally {
+    if (trimbleRapport) { trimbleRapport.authentication = { ...trimbleAuthStatus }; visTrimbleRapport(); }
+    $('trimbleDiagnosticCopyStatus').textContent = 'Autentiseringsstatus oppdatert. Ingen tokenverdi er med i rapporten. Ingen fil er lastet opp.';
+    btn.disabled = false;
   }
 }
 
