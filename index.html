@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.10</title>
+  <title>Modellkontroll v4.11-preview.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.10</b>
+    <b>Modellkontroll v4.11-preview.1</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -236,11 +236,22 @@
   
   <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
-  <button class="btn btn-primary" onclick="lagreLokalt()">💾 Lagre fil (.json)</button>
+  <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
+  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.1. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
+<dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
+  <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
+  <p style="margin:12px 0;">Preview.1 klargjør JSON og viser API-diagnostikk. Ingen fil er lastet opp eller lagret i Trimble Connect. Tomme metodelister beviser ikke at et API mangler.</p>
+  <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+    <button class="btn" onclick="kopierTrimbleDiagnostikk()">Kopier diagnostikk</button>
+    <button class="btn" onclick="document.getElementById('trimbleDiagnosticDialog').close()">Lukk</button>
+  </div>
+  <p id="trimbleDiagnosticCopyStatus" role="status" style="margin-top:10px;"></p>
+</dialog>
 <main id="exportContainer">
   <div id="pdfSummary">
     <img src="norconsult-logo-black.png" alt="Norconsult" style="max-height: 40px; margin-bottom: 20px; display: block;">
@@ -317,6 +328,7 @@
 </main>
 
 <script>
+const APP_VERSION = '4.11-preview.1';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -1421,12 +1433,13 @@ function eksporterPDF() {
   });
 }
 
-async function lagreLokalt() {
-  if (!validerAktivFase()) return;
-  oppdaterValgteModeller(); 
-
-  const eksportData = {
+function byggEksportData() {
+  oppdaterValgteModeller();
+  return {
     metadata: {
+      formatVersion: '1.0',
+      sourceApplication: 'Modellkontroll',
+      sourceVersion: APP_VERSION,
       fag: valgteFag,
       sistOppdatertFase: aktivFase,
       dato: new Date().toISOString(),
@@ -1441,25 +1454,109 @@ async function lagreLokalt() {
     strukturDataEndringer: strukturData 
   };
   
-  const jsonString = JSON.stringify(eksportData, null, 2);
-  const filnavnFag = valgteFag.length > 1 ? 'Samlet' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Eksport');
-  const forslattFilnavn = `KS_${filnavnFag}_${aktivFase.replace(/\s+/g, '')}_${new Date().toISOString().slice(0,10)}.json`;
+}
 
+function byggEksportFilnavn(dato = new Date().toISOString()) {
+  const filnavnFag = valgteFag.length > 1 ? 'Samlet' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Eksport');
+  return `KS_${filnavnFag}_${aktivFase.replace(/\s+/g, '')}_${dato.slice(0,10)}.json`;
+}
+
+function klargjorJsonEksport() {
+  if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
+  const data = byggEksportData();
+  const tekst = JSON.stringify(data, null, 2);
+  return { data, tekst, filnavn: byggEksportFilnavn(data.metadata.dato),
+    blob: new Blob([tekst], { type: 'application/json' }) };
+}
+
+function hentTrimbleApiDiagnostikk() {
+  const rapport = {
+    version: APP_VERSION,
+    apiAvailable: !!API,
+    uploadImplemented: false,
+    uploaded: false,
+    note: 'Kun lokale observasjoner. Ingen API-metoder kalles. Tomme lister kan skyldes proxy eller ikke-enumererbare metoder.',
+    namespaces: {}
+  };
+  for (const navn of ['project', 'files', 'extension', 'user']) {
+    try {
+      const verdi = API ? API[navn] : null;
+      rapport.namespaces[navn] = {
+        observedType: typeof verdi,
+        enumerableKeys: verdi == null ? [] : Object.keys(verdi)
+      };
+    } catch (_) {
+      rapport.namespaces[navn] = { inspectionFailed: true };
+    }
+  }
+  return rapport;
+}
+
+async function lagreTilTrimbleConnect() {
+  const btn = $('trimbleSaveBtn');
+  if (btn.disabled) return;
+  const opprinneligTekst = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Klargjør diagnostikk...';
   try {
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const lenke = document.createElement("a");
+    if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
+    if (!validerAktivFase()) return;
+    const eksport = klargjorJsonEksport();
+    const rapport = hentTrimbleApiDiagnostikk();
+    rapport.export = {
+      filename: eksport.filnavn,
+      bytes: eksport.blob.size,
+      modelCount: eksport.data.metadata.modeller.length,
+      formatVersion: eksport.data.metadata.formatVersion
+    };
+    $('trimbleDiagnosticText').value = JSON.stringify(rapport, null, 2);
+    $('trimbleDiagnosticCopyStatus').textContent = '';
+    const dialog = $('trimbleDiagnosticDialog');
+    if (!dialog.open) dialog.showModal();
+    console.info('[Modellkontroll ' + APP_VERSION + '] Diagnostikk, ingen opplasting:', rapport);
+    setStatus('Kun diagnostikk. Ingen fil er lagret i Trimble Connect.', 'warn');
+  } catch (err) {
+    console.error('[Modellkontroll] Diagnostikk feilet:', err);
+    setStatus('Diagnostikk feilet. Ingen fil er lastet opp.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = opprinneligTekst;
+  }
+}
+
+async function kopierTrimbleDiagnostikk() {
+  const felt = $('trimbleDiagnosticText');
+  try {
+    await navigator.clipboard.writeText(felt.value);
+    $('trimbleDiagnosticCopyStatus').textContent = 'Diagnostikk kopiert.';
+  } catch (_) {
+    felt.focus();
+    felt.select();
+    $('trimbleDiagnosticCopyStatus').textContent = 'Automatisk kopiering var ikke tilgjengelig. Trykk Ctrl+C for å kopiere markert tekst.';
+  }
+}
+
+async function lagreLokalt() {
+  let url = null;
+  let lenke = null;
+  try {
+    if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
+    if (!validerAktivFase()) return;
+    const eksport = klargjorJsonEksport();
+    url = URL.createObjectURL(eksport.blob);
+    lenke = document.createElement('a');
     lenke.href = url;
-    lenke.download = forslattFilnavn;
+    lenke.download = eksport.filnavn;
     document.body.appendChild(lenke);
     lenke.click();
-    document.body.removeChild(lenke);
-    URL.revokeObjectURL(url);
-    
-    setStatus(`✅ Filen ble lastet ned til nedlastingsmappen.`, 'ok');
+    setStatus('Lokal nedlasting startet. Ingen fil er lagret i Trimble Connect.', 'ok');
   } catch (err) {
     console.error(err);
-    alert("En feil oppstod under lagring: " + err.message);
+    setStatus('Lokal lagring feilet.', 'error');
+    alert('En feil oppstod under lagring: ' + err.message);
+  } finally {
+    if (lenke) lenke.remove();
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
 
