@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.11-preview.3</title>
+  <title>Modellkontroll v4.11-preview.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.11-preview.3</b>
+    <b>Modellkontroll v4.11-preview.4</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -237,14 +237,15 @@
   <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
   <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
-  <button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.3. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
+  <button class="btn btn-outline" id="modellDiagnoseBtn" onclick="diagnostiserModellkobling()">Diagnostiser modellkobling</button>
+<button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.4. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
 <dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
   <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
-  <p style="margin:12px 0;">Preview.3 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
+  <p style="margin:12px 0;">Preview.4 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
   <section style="margin:12px 0;"><p id="trimbleFolderPath"></p><div id="trimbleFolderList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;"></div><button class="btn" id="trimbleSelectFolderBtn" disabled onclick="velgTrimbleKontrollmappe()">Velg vist mappe som kontrollmappe (kun test)</button><p id="trimbleReadStatus" role="status"></p></section>
   <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
@@ -331,7 +332,7 @@
 </main>
 
 <script>
-const APP_VERSION = '4.11-preview.3';
+const APP_VERSION = '4.11-preview.4';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -682,6 +683,7 @@ function oppdaterOppsummeringUI() {
 }
 
 async function hentModeller() {
+  modellSnapshot('scan-before');
   const scanBtn = $('scanBtn');
   scanBtn.innerText = '⏳ Skanner...';
   gjeldendeVersjoner = {}; 
@@ -741,11 +743,13 @@ async function hentModeller() {
     scanBtn.innerText = `✅ Fant ${tilgjengeligeModeller.length} modeller`;
     setTimeout(() => { scanBtn.innerText = '🔍 Skann 3D-visning på nytt'; }, 3000);
   } catch(e) {
+    modellSnapshot('scan-failed');
     scanBtn.innerText = '❌ Feil ved skann';
   }
 }
 
 function tegnModellListe() {
+  modellSnapshot('render-before');
   const container = $('modelList');
   container.innerHTML = '';
   if(tilgjengeligeModeller.length === 0 && valgteModeller.length === 0) {
@@ -776,6 +780,7 @@ function toggleAlleModeller(masterCheckbox) {
 }
 
 function oppdaterValgteModeller() {
+  modellSnapshot('selection-before');
   valgteModeller = [];
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
   
@@ -793,6 +798,7 @@ function oppdaterValgteModeller() {
       }
   });
 
+  modellSnapshot('selection-after');
   $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
   setStatus('🟠 Ulagrede endringer', 'warn');
 }
@@ -1437,6 +1443,7 @@ function eksporterPDF() {
 }
 
 function byggEksportData() {
+  modellSnapshot('export-before-selection-refresh');
   oppdaterValgteModeller();
   return {
     metadata: {
@@ -1472,13 +1479,89 @@ function klargjorJsonEksport() {
     blob: new Blob([tekst], { type: 'application/json' }) };
 }
 
+// Preview.4: kun lesing og observasjon. Ingen endring av kontroll- eller modelldata.
+const modellDiagnoseLogg = [];
+function modellSnapshot(kilde) {
+  const bokser = Array.from($('modelList').querySelectorAll('input[type="checkbox"]'));
+  const snapshot = { source: kilde, selectedNames: [...valgteModeller], availableCount: tilgjengeligeModeller.length,
+    checkboxCount: bokser.length, checkedCount: bokser.filter(b => b.checked).length,
+    historyModelCount: Object.keys(modellHistorikk).length };
+  modellDiagnoseLogg.push(snapshot);
+  if (modellDiagnoseLogg.length > 12) modellDiagnoseLogg.shift();
+  return snapshot;
+}
+function modellDiagnoseListe(res) {
+  return Array.isArray(res) ? res : (Array.isArray(res?.models) ? res.models : (Array.isArray(res?.items) ? res.items : null));
+}
+function modellDiagnoseElement(m) {
+  const felt = {};
+  for (const k of ['id','modelId','modelid','fileId','versionId','name','fileName','filename']) {
+    if (typeof m?.[k] === 'string' || typeof m?.[k] === 'number') felt[k] = m[k];
+  }
+  return { fields: felt, keys: m && typeof m === 'object' ? Object.keys(m).filter(k => !/token|secret|auth/i.test(k)) : [],
+    objectsCount: Array.isArray(m?.objects) ? m.objects.length : null,
+    objectRuntimeIdsCount: Array.isArray(m?.objectRuntimeIds) ? m.objectRuntimeIds.length : null };
+}
+async function diagnostiserModellkobling() {
+  const btn = $('modellDiagnoseBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const rapport = { version: APP_VERSION, diagnosticOnly: true, uploaded: false,
+      stateBefore: modellSnapshot('diagnostic-start'), sources: [], observations: [],
+      exportContract: { modeller: 'Array of model names; legacy format retained',
+        explicitIdsExported: false, viewerIdIsNotVerifiedFileId: true } };
+    for (const [namespace, method] of [['models','getModels'],['viewer','getModels'],['viewer','getObjects']]) {
+      const source = { method: namespace + '.' + method };
+      rapport.sources.push(source);
+      const owner = API?.[namespace];
+      if (!owner || typeof owner[method] !== 'function') { source.state = 'unavailable'; continue; }
+      try {
+        const res = await medDiagnostikkTidsgrense(() => owner[method]());
+        const list = modellDiagnoseListe(res);
+        source.responseShape = Array.isArray(res) ? 'array' : typeof res;
+        source.state = list ? 'received' : 'unrecognizedShape';
+        if (!list) continue;
+        source.count = list.length;
+        source.sample = list.slice(0, 15).map(modellDiagnoseElement);
+        source.sampleTruncated = list.length > 15;
+        if (method === 'getObjects') {
+          source.acceptedByExistingScan = list.filter(m => (m?.objects || []).length > 0).length;
+          source.withRuntimeIdsButNoObjects = list.filter(m => !((m?.objects || []).length > 0) && Array.isArray(m?.objectRuntimeIds) && m.objectRuntimeIds.length > 0).length;
+          if (source.withRuntimeIdsButNoObjects > 0) rapport.observations.push('OBJECTS_FILTER_EXCLUDES_RUNTIME_ID_MODELS');
+          if (!list.length) rapport.observations.push('VIEWER_RETURNED_NO_OBJECT_GROUPS');
+        }
+      } catch (err) {
+        source.state = err?.message === 'DIAGNOSTIC_TIMEOUT' ? 'timeout' : 'failed';
+        // Ingen raafeilmeldinger eller vilkaarlege responsobjekter i rapporten.
+      }
+    }
+    const snapshot = rapport.stateBefore;
+    if (!snapshot.availableCount && !snapshot.checkboxCount) rapport.observations.push('NO_AVAILABLE_MODELS_OR_CHECKBOXES');
+    if (snapshot.checkboxCount && !snapshot.checkedCount) rapport.observations.push('ALL_MODEL_CHECKBOXES_UNCHECKED');
+    if (snapshot.selectedNames.length && !snapshot.checkboxCount) rapport.observations.push('SELECTION_AT_RISK_WHEN_EXPORT_READS_EMPTY_DOM');
+    if (!snapshot.selectedNames.length && snapshot.historyModelCount) rapport.observations.push('HISTORY_PRESENT_BUT_CURRENT_SELECTION_EMPTY');
+    rapport.availableModels = tilgjengeligeModeller.slice(0, 30).map(modellDiagnoseElement);
+    rapport.availableModelsTruncated = tilgjengeligeModeller.length > 30;
+    rapport.stateAfter = modellSnapshot('diagnostic-end');
+    rapport.recentSelectionSnapshots = modellDiagnoseLogg.slice();
+    rapport.nextStep = 'Diagnostikk endrer ikke modellvalg, eksportformat eller kontrollhistorikk.';
+    if (!trimbleRapport) trimbleRapport = hentTrimbleApiDiagnostikk();
+    trimbleRapport.modelLinkDiagnostics = rapport;
+    visTrimbleRapport();
+    const dialog = $('trimbleDiagnosticDialog');
+    if (!dialog.open) dialog.showModal();
+    $('trimbleDiagnosticCopyStatus').textContent = 'Modellrapport klar. Ingen modeller er valgt automatisk og ingen prosjektdata er endret.';
+  } finally { btn.disabled = false; }
+}
+
 function hentTrimbleApiDiagnostikk() {
   const rapport = {
     version: APP_VERSION,
     apiAvailable: !!API,
     uploadImplemented: false,
     uploaded: false,
-    note: 'Prosjekt leses med getProject. Autentisering krever eget knappetrykk. Ingen opplasting eller REST-kall. Tomme metodelister beviser ikke manglende API.',
+    note: 'Prosjekt leses med getProject. Autentisering krever eget knappetrykk. Ingen opplasting. Lesetesten bruker skrivebeskyttede REST GET-kall. Tomme metodelister beviser ikke manglende API.',
     namespaces: {}
   };
   for (const navn of ['project', 'files', 'extension', 'user']) {
@@ -1563,11 +1646,11 @@ async function lagreTilTrimbleConnect() {
     if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
     // Diagnostikk skal ogsaa kunne kjoeres uten signert/ferdig kontroll.
     const eksport = klargjorJsonEksport();
-    trimbleRapport = hentTrimbleApiDiagnostikk();
+    trimbleRapport = { ...trimbleRapport, ...hentTrimbleApiDiagnostikk() };
     trimbleRapport.export = analyserEksportForPublisering(eksport);
     trimbleRapport.authentication = { ...trimbleAuthStatus };
     trimbleRapport.uploadRoute = { implemented: false, endpointVerified: false,
-      reason: 'REST-opplasting, region, mappe og rettigheter er ikke verifisert i denne versjonen.' };
+      reason: 'Opplasting og skriverettigheter er ikke verifisert. Lesetilgang rapporteres separat under readOnlyTest.' };
     trimbleRapport.project = { state: 'reading' };
     visTrimbleRapport();
     $('trimbleDiagnosticCopyStatus').textContent = '';
