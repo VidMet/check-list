@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.11-preview.4</title>
+  <title>Modellkontroll v4.11-preview.5</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.11-preview.4</b>
+    <b>Modellkontroll v4.11-preview.5</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -238,14 +238,14 @@
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
   <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
   <button class="btn btn-outline" id="modellDiagnoseBtn" onclick="diagnostiserModellkobling()">Diagnostiser modellkobling</button>
-<button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.4. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
+<button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.5. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
 <dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
   <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
-  <p style="margin:12px 0;">Preview.4 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
+  <p style="margin:12px 0;">Preview.5 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
   <section style="margin:12px 0;"><p id="trimbleFolderPath"></p><div id="trimbleFolderList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;"></div><button class="btn" id="trimbleSelectFolderBtn" disabled onclick="velgTrimbleKontrollmappe()">Velg vist mappe som kontrollmappe (kun test)</button><p id="trimbleReadStatus" role="status"></p></section>
   <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
@@ -332,7 +332,7 @@
 </main>
 
 <script>
-const APP_VERSION = '4.11-preview.4';
+const APP_VERSION = '4.11-preview.5';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -650,6 +650,7 @@ function leggTilLogg() {
     return;
   }
   
+  registrerModellHistorikk();
   const dato = new Date().toLocaleString('no-NB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   
   oppsummeringLogg.push({ fase: aktivFase, initialer: init, dato: dato, tekst: tekst });
@@ -682,125 +683,159 @@ function oppdaterOppsummeringUI() {
   });
 }
 
+let sisteModellSkann = { state: 'notRun' };
+let modellSkannPagar = false;
+let modellListeKlar = false;
+
+function modellIdVerdi(v) {
+  return (typeof v === 'string' && v.length) || (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null;
+}
+function modellListeFraSvar(res) {
+  return Array.isArray(res) ? res : (Array.isArray(res?.models) ? res.models : (Array.isArray(res?.items) ? res.items : null));
+}
+function registrerModellHistorikk() {
+  // Kun eksplisitt modellvalg/skanning/signering. Aldri automatisk ved eksport/fasebytte.
+  for (const navn of valgteModeller) {
+    const versjon = gjeldendeVersjoner[navn];
+    if (!versjon) continue;
+    if (!Object.hasOwn(modellHistorikk, navn)) Object.defineProperty(modellHistorikk, navn, { value: {}, enumerable: true, writable: true, configurable: true });
+    const historikk = modellHistorikk[navn];
+    // Ikke erstatt en dokumentert versjon i en allerede signert fase.
+    if (signaturData[aktivFase] && Object.hasOwn(historikk, aktivFase)) continue;
+    historikk[aktivFase] = versjon;
+  }
+}
+
 async function hentModeller() {
+  if (modellSkannPagar) return;
+  modellSkannPagar = true;
   modellSnapshot('scan-before');
   const scanBtn = $('scanBtn');
-  scanBtn.innerText = '⏳ Skanner...';
-  gjeldendeVersjoner = {}; 
-  
+  scanBtn.disabled = true;
+  scanBtn.innerText = 'Skanner 3D-visning...';
+  sisteModellSkann = { state: 'running', stage: 'getModels', selectedBefore: valgteModeller.length };
   try {
-    if (API && API.viewer) {
-      const nameMap = new Map();
-      const versionMap = new Map();
-      
-      const srcs = [() => API.models?.getModels(), () => API.viewer?.getModels()];
-      for (const src of srcs) {
-        try {
-          const res = await src();
-          const list = Array.isArray(res) ? res : (res?.models || res?.items || []);
-          list.forEach(m => {
-            const id = m.id || m.modelId;
-            const fn = [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string' && /\.(ifc|trb|dwg|rvt|skp|tekla|dxf)/i.test(v)) 
-                       || [m.name, m.fileName, m.filename].find(v => v && typeof v === 'string');
-                       
-            if (id && fn) {
-                nameMap.set(id, lastPathPart(fn));
-                versionMap.set(id, m.versionId || m.id || 'ukjent');
-            }
-          });
-        } catch(e){}
-      }
-
-      const objs = await API.viewer.getObjects();
-      const gyldigeModeller = (objs || []).map(m => {
-        const mid = m.modelId || m.modelid;
-        return {
-          id: mid,
-          name: nameMap.get(mid) || m.name || 'Ukjent modell',
-          versionId: versionMap.get(mid) || 'ukjent',
-          antallObjekter: (m.objects || []).length
-        };
-      }).filter(m => m.antallObjekter > 0); 
-      
-      tilgjengeligeModeller = gyldigeModeller.map(m => {
-          gjeldendeVersjoner[m.name] = m.versionId; 
-          return { id: m.id, name: m.name };
-      });
-      
-    } else {
-      tilgjengeligeModeller = [ {id: 'm1', name: 'E6_Vegmodell_R761.ifc'}, {id: 'm2', name: 'E6_Rekkverk.trb'} ];
-      gjeldendeVersjoner['E6_Vegmodell_R761.ifc'] = 'lokal_test_1';
-      gjeldendeVersjoner['E6_Rekkverk.trb'] = 'lokal_test_2';
+    if (typeof API?.viewer?.getModels !== 'function' || typeof API?.viewer?.getObjects !== 'function') throw new Error('VIEWER_API_UNAVAILABLE');
+    const modeller = modellListeFraSvar(await medDiagnostikkTidsgrense(() => API.viewer.getModels()));
+    if (!modeller) throw new Error('UNRECOGNIZED_MODELS_RESPONSE');
+    sisteModellSkann.modelCount = modeller.length;
+    const kart = new Map();
+    for (const m of modeller) {
+      const id = modellIdVerdi(m.id ?? m.modelId);
+      if (id) kart.set(id, m);
     }
-    
-    valgteModeller = tilgjengeligeModeller.map(m => m.name);
-    tegnModellListe();
-    
-    $('modelBtn').disabled = false;
-    $('checkAllModels').checked = true;
+    sisteModellSkann.stage = 'getObjects';
+    const grupper = modellListeFraSvar(await medDiagnostikkTidsgrense(() => API.viewer.getObjects()));
+    if (!grupper) throw new Error('UNRECOGNIZED_OBJECTS_RESPONSE');
+    sisteModellSkann.objectGroupCount = grupper.length;
+    const funnet = new Map();
+    for (const gruppe of grupper) {
+      const antall = Array.isArray(gruppe.objects) ? gruppe.objects.length : (Array.isArray(gruppe.objectRuntimeIds) ? gruppe.objectRuntimeIds.length : 0);
+      if (!antall) continue;
+      const id = modellIdVerdi(gruppe.modelId ?? gruppe.modelid);
+      if (!id || funnet.has(id)) continue;
+      const m = kart.get(id);
+      const navn = [m?.name, m?.fileName, m?.filename, gruppe.name].find(v => typeof v === 'string' && v.trim());
+      const versionId = modellIdVerdi(m?.versionId);
+      funnet.set(id, { id, name: navn ? lastPathPart(navn) : '[Uavklart modell ' + id + ']',
+        versionId, antallObjekter: antall, nameResolved: !!navn, metadataMatched: !!m });
+    }
+    const liste = Array.from(funnet.values());
+    sisteModellSkann.matchedCount = liste.filter(m => m.metadataMatched).length;
+    sisteModellSkann.unresolvedCount = liste.filter(m => !m.nameResolved).length;
+    sisteModellSkann.missingVersionCount = liste.filter(m => !m.versionId).length;
+    if (!liste.length) throw new Error('NO_OBJECT_MODELS_FOUND');
+    // Navnebasert legacy-format kan ikke skille to ulike modeller med samme navn.
+    if (new Set(liste.map(m => m.name)).size !== liste.length) throw new Error('DUPLICATE_MODEL_NAMES');
+    sisteModellSkann.stage = 'render';
+    const tidligereValg = valgteModeller.slice();
+    const tidligereListe = tilgjengeligeModeller;
+    const tidligereVersjoner = gjeldendeVersjoner;
+    try {
+      const nyeVersjoner = Object.create(null);
+      for (const m of liste) if (m.versionId) nyeVersjoner[m.name] = m.versionId;
+      // Behold importerte/valgte modeller selv om de ikke finnes i denne visningen.
+      tilgjengeligeModeller = liste.concat(tidligereValg.filter(n => !liste.some(m => m.name === n)).map(name => ({ name, retained: true })));
+      gjeldendeVersjoner = nyeVersjoner;
+      valgteModeller = tidligereValg.length ? tidligereValg : liste.filter(m => m.nameResolved).map(m => m.name);
+      tegnModellListe();
+    } catch (err) {
+      tilgjengeligeModeller = tidligereListe;
+      gjeldendeVersjoner = tidligereVersjoner;
+      valgteModeller = tidligereValg;
+      throw err;
+    }
     oppdaterValgteModeller();
-    
-    scanBtn.innerText = `✅ Fant ${tilgjengeligeModeller.length} modeller`;
-    setTimeout(() => { scanBtn.innerText = '🔍 Skann 3D-visning på nytt'; }, 3000);
-  } catch(e) {
+    registrerModellHistorikk();
+    $('modelBtn').disabled = false;
+    sisteModellSkann.state = 'passed';
+    sisteModellSkann.stage = 'complete';
+    sisteModellSkann.availableCount = tilgjengeligeModeller.length;
+    sisteModellSkann.selectedAfter = valgteModeller.length;
+    scanBtn.innerText = 'Fant ' + liste.length + ' modeller. Skann igjen';
+    setStatus('Modelliste oppdatert. ' + valgteModeller.length + ' valgt. Historikk registreres kun for aktiv fase; tidligere faser etterfylles ikke.' +
+      (sisteModellSkann.missingVersionCount ? ' Noen modeller mangler versjons-ID.' : ''), 'warn');
+    modellSnapshot('scan-after');
+  } catch (err) {
+    sisteModellSkann.state = 'failed';
+    sisteModellSkann.error = /^(VIEWER_API_UNAVAILABLE|UNRECOGNIZED_MODELS_RESPONSE|UNRECOGNIZED_OBJECTS_RESPONSE|NO_OBJECT_MODELS_FOUND|DUPLICATE_MODEL_NAMES|DIAGNOSTIC_TIMEOUT)$/.test(err?.message || '') ? err.message : 'SCAN_OR_RENDER_FAILED';
+    scanBtn.innerText = 'Skanning feilet. Proev igjen';
+    setStatus('Skanning feilet (' + sisteModellSkann.error + '). Eksisterende modellvalg og historikk beholdes.', 'error');
     modellSnapshot('scan-failed');
-    scanBtn.innerText = '❌ Feil ved skann';
+  } finally {
+    modellSkannPagar = false;
+    scanBtn.disabled = false;
   }
 }
 
 function tegnModellListe() {
   modellSnapshot('render-before');
   const container = $('modelList');
-  container.innerHTML = '';
-  if(tilgjengeligeModeller.length === 0 && valgteModeller.length === 0) {
-    container.innerHTML = '<span style="font-size:10px;">Ingen modeller tilgjengelig.</span>';
-    return;
-  }
-  const modellerÅVise = tilgjengeligeModeller.length > 0 ? tilgjengeligeModeller.map(m=>m.name) : valgteModeller;
-  
-  modellerÅVise.forEach(mName => {
-    const isChecked = valgteModeller.includes(mName) ? 'checked' : '';
+  const navn = [...new Set([...tilgjengeligeModeller.map(m => m.name), ...valgteModeller])];
+  const fragment = document.createDocumentFragment();
+  for (const name of navn) {
+    const modell = tilgjengeligeModeller.find(m => m.name === name);
     const label = document.createElement('label');
     label.className = 'model-label';
-    label.innerHTML = `
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="checkbox" value="${mName}" onchange="oppdaterValgteModeller()" ${isChecked}>
-        <span title="${mName}">${mName}</span>
-      </div>
-    `;
-    container.appendChild(label);
-  });
+    const rad = document.createElement('div');
+    rad.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = name; cb.checked = valgteModeller.includes(name);
+    cb.disabled = modell?.nameResolved === false;
+    cb.addEventListener('change', () => oppdaterValgteModeller(true));
+    const tekst = document.createElement('span');
+    tekst.textContent = name + (modell?.retained ? ' (beholdt fra tidligere valg)' : '');
+    tekst.title = name + (modell?.id ? '\nModell-ID: ' + modell.id : '') + (modell?.versionId ? '\nVersjon: ' + modell.versionId : '\nVersjons-ID ikke bekreftet');
+    rad.appendChild(cb); rad.appendChild(tekst); label.appendChild(rad); fragment.appendChild(label);
+  }
+  if (!navn.length) {
+    const tekst = document.createElement('span');
+    tekst.textContent = 'Ingen modeller tilgjengelig. Trykk Skann 3D-visning.';
+    fragment.appendChild(tekst);
+  }
+  container.replaceChildren(fragment);
+  modellListeKlar = true;
 }
 
 function toggleModelDropdown() { $('modelDropdown').classList.toggle('show'); }
 function toggleAlleModeller(masterCheckbox) {
   const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
-  checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
-  oppdaterValgteModeller();
+  checkboxes.forEach(cb => { if (!cb.disabled) cb.checked = masterCheckbox.checked; });
+  oppdaterValgteModeller(true);
 }
 
-function oppdaterValgteModeller() {
+function oppdaterValgteModeller(registrerHistorikk = false) {
   modellSnapshot('selection-before');
-  valgteModeller = [];
-  const checkboxes = $('modelList').querySelectorAll('input[type="checkbox"]');
-  
-  checkboxes.forEach(cb => {
-      const mName = cb.value;
-      if(cb.checked) {
-          valgteModeller.push(mName);
-          if (!modellHistorikk[mName]) modellHistorikk[mName] = {};
-          
-          if (gjeldendeVersjoner[mName]) {
-              modellHistorikk[mName][aktivFase] = gjeldendeVersjoner[mName];
-          } else if (!modellHistorikk[mName][aktivFase]) {
-              modellHistorikk[mName][aktivFase] = 'ukjent';
-          }
-      }
-  });
-
+  const checkboxes = Array.from($('modelList').querySelectorAll('input[type="checkbox"]'));
+  // Tom/ikke tegnet DOM er ikke et eksplisitt valg om aa fjerne alle modeller.
+  if (modellListeKlar && checkboxes.length) {
+    valgteModeller = [...new Set(checkboxes.filter(cb => cb.checked && !cb.disabled).map(cb => cb.value))];
+    $('checkAllModels').checked = checkboxes.filter(cb => !cb.disabled).length > 0 && checkboxes.filter(cb => !cb.disabled).every(cb => cb.checked);
+  }
+  if (registrerHistorikk) registrerModellHistorikk();
   modellSnapshot('selection-after');
-  $('modelBtn').innerText = `📦 Modeller (${valgteModeller.length} valgt) ▼`;
-  setStatus('🟠 Ulagrede endringer', 'warn');
+  $('modelBtn').innerText = 'Modeller (' + valgteModeller.length + ' valgt)';
+  if (registrerHistorikk) setStatus('Modellvalg oppdatert. Historikk gjelder bare aktiv fase.', 'warn');
 }
 
 document.addEventListener('click', (e) => {
@@ -1479,7 +1514,7 @@ function klargjorJsonEksport() {
     blob: new Blob([tekst], { type: 'application/json' }) };
 }
 
-// Preview.4: kun lesing og observasjon. Ingen endring av kontroll- eller modelldata.
+// Preview.5: kun lesing og observasjon. Ingen endring av kontroll- eller modelldata.
 const modellDiagnoseLogg = [];
 function modellSnapshot(kilde) {
   const bokser = Array.from($('modelList').querySelectorAll('input[type="checkbox"]'));
@@ -1509,6 +1544,7 @@ async function diagnostiserModellkobling() {
   try {
     const rapport = { version: APP_VERSION, diagnosticOnly: true, uploaded: false,
       stateBefore: modellSnapshot('diagnostic-start'), sources: [], observations: [],
+      lastScan: { ...sisteModellSkann },
       exportContract: { modeller: 'Array of model names; legacy format retained',
         explicitIdsExported: false, viewerIdIsNotVerifiedFileId: true } };
     for (const [namespace, method] of [['models','getModels'],['viewer','getModels'],['viewer','getObjects']]) {
@@ -1545,7 +1581,7 @@ async function diagnostiserModellkobling() {
     rapport.availableModelsTruncated = tilgjengeligeModeller.length > 30;
     rapport.stateAfter = modellSnapshot('diagnostic-end');
     rapport.recentSelectionSnapshots = modellDiagnoseLogg.slice();
-    rapport.nextStep = 'Diagnostikk endrer ikke modellvalg, eksportformat eller kontrollhistorikk.';
+    rapport.nextStep = 'Se lastScan for skanneresultat. Modellnavn og fasehistorikk beholdes i legacy-format. Diagnostikken endrer ikke valget.';
     if (!trimbleRapport) trimbleRapport = hentTrimbleApiDiagnostikk();
     trimbleRapport.modelLinkDiagnostics = rapport;
     visTrimbleRapport();
@@ -1890,6 +1926,7 @@ async function lagreLokalt() {
     if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
     if (!validerAktivFase()) return;
     const eksport = klargjorJsonEksport();
+    if (!eksport.data.metadata.modeller.length && !confirm('Ingen modeller er valgt. Eksporten vil mangle modellkobling. Lagre likevel?')) return;
     url = URL.createObjectURL(eksport.blob);
     lenke = document.createElement('a');
     lenke.href = url;
@@ -1960,6 +1997,8 @@ function lastInnFil(event) {
       aktivFase = data.metadata?.sistOppdatertFase || 'Egenkontroll';
       $('faseFilter').value = aktivFase;
       
+      gjeldendeVersjoner = {}; // Importert historikk er ikke en ny observasjon av aktuell versjon.
+      sisteModellSkann = { state: 'notRun', reason: 'reportImported' };
       tilgjengeligeModeller = valgteModeller.map(m => ({name: m}));
       
       const modelBtn = $('modelBtn');
