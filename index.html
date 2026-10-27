@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Modellkontroll v4.11-preview.5</title>
+  <title>Modellkontroll v4.11-preview.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -171,7 +171,7 @@
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Modellkontroll v4.11-preview.5</b>
+    <b>Modellkontroll v4.11-preview.6</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -236,16 +236,16 @@
   
   <input type="file" id="jsonUpload" accept=".json" style="display: none;" onchange="lastInnFil(event)">
   <button class="btn btn-secondary" onclick="document.getElementById('jsonUpload').click()">📂 Åpne fil</button>
-  <button class="btn btn-primary" onclick="lagreLokalt()">Lagre lokalt (.json)</button>
+  <button class="btn btn-primary" onclick="lagreLokalt()">Lagre JSON + PDF</button>
   <button class="btn btn-outline" id="modellDiagnoseBtn" onclick="diagnostiserModellkobling()">Diagnostiser modellkobling</button>
-<button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.5. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
+<button class="btn btn-outline" id="trimbleSaveBtn" onclick="lagreTilTrimbleConnect()" title="Kun diagnostikk i preview.6. Ingen filer lastes opp.">Trimble Connect (diagnostikk)</button>
 </div>
 
 <div id="signaturInfo"></div>
 
 <dialog id="trimbleDiagnosticDialog" aria-labelledby="trimbleDiagnosticTitle" style="margin:auto; padding:20px; border:1px solid #d1d5db; border-radius:10px; width:min(760px,94vw); max-height:85vh; overflow:auto;">
   <h2 id="trimbleDiagnosticTitle">Trimble Connect: diagnostikk</h2>
-  <p style="margin:12px 0;">Preview.5 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
+  <p style="margin:12px 0;">Preview.6 tester lesetilgang med GET og lar deg bla i mapper. Ingen filer eller mapper opprettes eller endres. Token beholdes bare kortvarig i minnet, aldri i rapport eller eksport. Mappevalg gjelder kun denne testen.</p>
   <section style="margin:12px 0;"><p id="trimbleFolderPath"></p><div id="trimbleFolderList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;"></div><button class="btn" id="trimbleSelectFolderBtn" disabled onclick="velgTrimbleKontrollmappe()">Velg vist mappe som kontrollmappe (kun test)</button><p id="trimbleReadStatus" role="status"></p></section>
   <textarea id="trimbleDiagnosticText" readonly aria-label="Diagnostikkrapport" style="width:100%;height:300px;font-family:monospace;padding:10px;"></textarea>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
@@ -332,7 +332,7 @@
 </main>
 
 <script>
-const APP_VERSION = '4.11-preview.5';
+const APP_VERSION = '4.11-preview.6';
 let API = null;
 let strukturData = null; 
 let valgteFag = []; 
@@ -1407,76 +1407,6 @@ function byggPDFSummary() {
   });
 }
 
-function eksporterPDF() {
-  if (!validerAktivFase()) return;
-  oppdaterValgteModeller(); 
-  
-  const descPanel = $('beskrivelsePanel');
-  if (beskrivelseData.tekst.trim() === '' && beskrivelseData.bilder.length === 0) {
-    descPanel.classList.add('hide-empty');
-  }
-
-  $('oppsummeringKropp').style.display = 'flex';
-  $('oppsummeringPil').innerText = '▼ Oppsummering og logg';
-  
-  document.querySelectorAll('.kategori-body').forEach(el => el.style.display = 'flex');
-  document.querySelectorAll('.kategori-header span:first-child').forEach(el => { el.innerText = '▼'; });
-
-  document.querySelectorAll('#deltakerTabellBody input[type="text"]').forEach(input => {
-      input.setAttribute('value', input.value);
-  });
-  document.querySelectorAll('#deltakerTabellBody input[type="checkbox"]').forEach(input => {
-      if(input.checked) input.setAttribute('checked', 'checked');
-      else input.removeAttribute('checked');
-  });
-
-  const godkjentMsgEl = $('godkjentMessage');
-  const origGodkjentTekst = godkjentMsgEl.innerHTML;
-  if (aktivFase === 'Godkjent') {
-      godkjentMsgEl.innerHTML = '✓ Modeller er godkjent etter modellkontroll i Trimble Connect';
-  }
-
-  const container = $('exportContainer');
-  container.classList.add('pdf-mode');
-  
-  document.querySelectorAll('.punkt-kommentar').forEach(txt => {
-    if(txt.value.trim() === '') txt.classList.add('hide-empty');
-    else txt.style.height = txt.scrollHeight + 'px'; 
-  });
-
-  byggPDFSummary();
-  $('pdfSummary').style.display = 'block';
-
-  const filnavnFag = valgteFag.length > 1 ? 'Samlet' : (valgteFag.length === 1 ? strukturData[valgteFag[0]].navn : 'Eksport');
-  const dato = new Date().toISOString().slice(0, 10);
-  const rensFaseNavn = aktivFase.replace(/\s+/g, '');
-  
-  const opt = {
-    margin:       [15, 10, 15, 10], 
-    filename:     `Modellkontroll_${filnavnFag}_${rensFaseNavn}_${dato}.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: 'css', avoid: ['.kategori-panel', '.punkt-container', '.bilde-galleri-item', '#beskrivelsePanel', '.logg-element'] }
-  };
-
-  setStatus('⏳ Genererer PDF... Dette kan ta litt tid pga bildene.', 'warn');
-  
-  html2pdf().set(opt).from(container).save().then(() => {
-    container.classList.remove('pdf-mode');
-    descPanel.classList.remove('hide-empty');
-    $('pdfSummary').style.display = 'none';
-    
-    godkjentMsgEl.innerHTML = origGodkjentTekst;
-    
-    document.querySelectorAll('.punkt-kommentar').forEach(txt => {
-      txt.classList.remove('hide-empty');
-      txt.style.height = ''; 
-    });
-    setStatus('✅ PDF generert og lagt i nedlastinger.', 'ok');
-  });
-}
-
 function byggEksportData() {
   modellSnapshot('export-before-selection-refresh');
   oppdaterValgteModeller();
@@ -1514,7 +1444,7 @@ function klargjorJsonEksport() {
     blob: new Blob([tekst], { type: 'application/json' }) };
 }
 
-// Preview.5: kun lesing og observasjon. Ingen endring av kontroll- eller modelldata.
+// Preview.6: kun lesing og observasjon. Ingen endring av kontroll- eller modelldata.
 const modellDiagnoseLogg = [];
 function modellSnapshot(kilde) {
   const bokser = Array.from($('modelList').querySelectorAll('input[type="checkbox"]'));
@@ -1919,29 +1849,115 @@ async function kopierTrimbleDiagnostikk() {
   }
 }
 
-async function lagreLokalt() {
-  let url = null;
-  let lenke = null;
-  try {
-    if (!strukturData) throw new Error('Sjekklistene er ikke lastet inn.');
-    if (!validerAktivFase()) return;
-    const eksport = klargjorJsonEksport();
-    if (!eksport.data.metadata.modeller.length && !confirm('Ingen modeller er valgt. Eksporten vil mangle modellkobling. Lagre likevel?')) return;
-    url = URL.createObjectURL(eksport.blob);
-    lenke = document.createElement('a');
-    lenke.href = url;
-    lenke.download = eksport.filnavn;
-    document.body.appendChild(lenke);
-    lenke.click();
-    setStatus('Lokal nedlasting startet. Ingen fil er lagret i Trimble Connect.', 'ok');
-  } catch (err) {
-    console.error(err);
-    setStatus('Lokal lagring feilet.', 'error');
-    alert('En feil oppstod under lagring: ' + err.message);
-  } finally {
-    if (lenke) lenke.remove();
-    if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
+let lokalEksportPagar = false;
+function rapportEscape(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function byggLesbarRapport(data) {
+  const e = rapportEscape, m = data.metadata;
+  const faser = faseRekkefolge.slice();
+  const css = getComputedStyle(document.documentElement);
+  const farge = (navn, fallback) => css.getPropertyValue(navn).trim() || fallback;
+  const palett = { OK: [farge('--green-dim','#d7f0df'),'Ingen avvik, OK'], INFO: [farge('--yellow-dim','#fff1bd'),'Forbedringsforslag'], AVVIK: [farge('--red-dim','#f9d5d5'),'Avvik, m\u00e5 rettes'], IR: [farge('--surface2','#eeeeee'),'Ikke relevant'] };
+  const avsnitt = t => '<p style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5">'+e(t)+'</p>';
+  const bilder = arr => (arr || []).map((b,i) => {
+    const src = typeof b === 'string' ? b : b.src;
+    if (typeof src !== 'string' || !/^data:image\/(png|jpe?g|webp);base64,/i.test(src)) throw Error('Et bilde har et format som ikke kan tas med sikkert. Eksporten er stoppet for aa unngaa manglende dokumentasjon.');
+    return '<figure style="margin:10px 0;break-inside:avoid"><img alt="Kontrollbilde '+(i+1)+'" src="'+e(src)+'" style="display:block;max-width:100%;max-height:210mm;object-fit:contain">'+(b.tekst || b.kommentar || b.caption ? '<figcaption>'+e(b.tekst || b.kommentar || b.caption)+'</figcaption>' : '')+'</figure>';
+  }).join('');
+  const tabell = (head, rows) => '<table style="width:100%;border-collapse:collapse;margin:10px 0 20px;table-layout:fixed"><thead><tr>'+head.map(t=>'<th style="background:#e7edf5;border:1px solid #aab4c2;padding:8px;text-align:left">'+e(t)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(t=>'<td style="border:1px solid #aab4c2;padding:8px;overflow-wrap:anywhere">'+e(t)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  let html = '<h1 style="color:#183b62">Modellkontroll</h1>'+avsnitt('Eksportert: '+m.dato+'\nAktiv fase: '+m.sistOppdatertFase+'\nKildeversjon: '+m.sourceVersion);
+  html += '<h2>Kontrollfaser og signaturer</h2>'+tabell(['Fase','Kontrollert av / initialer','Dato og tidspunkt'],faser.map(f=>[f,m.signaturer?.[f]?.initialer || 'Ikke signert',m.signaturer?.[f]?.dato || '-']));
+  html += '<h2>Modeller som inng\u00e5r i kontrollen</h2>';
+  html += m.modeller?.length ? tabell(['Modell'],m.modeller.map(n=>[n])) : avsnitt('Ingen modeller registrert. Rapporten mangler modellkobling.');
+  const historikk = Object.entries(m.modellHistorikk || {}).flatMap(([n,h])=>Object.entries(h).map(([f,v])=>[n,f,v]));
+  if(historikk.length) html += '<h3>Dokumentert modellhistorikk</h3>'+tabell(['Modell','Fase','Versjon'],historikk);
+  html += '<h2>Beskrivelse</h2>'+avsnitt(m.beskrivelseData?.tekst || '')+bilder(m.beskrivelseData?.bilder);
+  if(m.deltakere?.length) html += '<h2>Deltakere</h2>'+tabell(['Navn','Fag','Til stede','Kopi'],m.deltakere.map(p=>[p.navn,p.fag,p.tilstede || p.tilStede ? 'Ja':'Nei',p.kopi ? 'Ja':'Nei']));
+  const sett = new Set();
+  const punkt = (id, tekst) => {
+    sett.add(id);
+    let innhold = '<h3 style="margin-bottom:8px">'+e(tekst || id)+'</h3>';
+    for (const f of faser) {
+      const d = data.kontrollData?.[id]?.[f];
+      if (!d || (!d.status && !d.kommentar && !d.bilder?.length)) continue;
+      const p = palett[d.status] || ['#f3f4f6',d.status || 'Ikke vurdert'];
+      innhold += '<div style="border-left:5px solid #64748b;margin:8px 0 16px;padding:10px;background:'+e(p[0])+';color:#17202a"><strong>'+e(f)+' : '+e(p[1])+'</strong>'+avsnitt(d.kommentar || '')+bilder(d.bilder)+'</div>';
+    }
+    return innhold;
+  };
+  // Alle fag og kontrollpunkter fra samme JSON, uavhengig av UI-filter og kollapsede paneler.
+  for(const [key,fag] of Object.entries(data.strukturDataEndringer || {})) {
+    html += '<h2 style="background:#183b62;color:white;padding:10px">'+e(fag.navn || key)+'</h2>';
+    for(const kat of fag.kategorier || []) {
+      html += '<h3>'+e(kat.navn)+'</h3>';
+      for(const p of kat.punkter || []) html += punkt(p.id,p.tekst);
+    }
   }
+  for(const id of Object.keys(data.kontrollData || {})) if(!sett.has(id)) html += punkt(id,id);
+  if(m.oppsummeringLogg?.length) {
+    html += '<h2>Oppsummering og logg</h2>';
+    for(const l of m.oppsummeringLogg) html += '<h3>'+e(l.fase)+' / '+e(l.initialer)+' / '+e(l.dato)+'</h3>'+avsnitt(l.tekst)+bilder(l.bilder);
+  }
+  return html;
+}
+async function genererRapportPdf(eksport) {
+  if(typeof html2pdf !== 'function') throw Error('PDF-biblioteket er ikke tilgjengelig. Proev igjen naar biblioteket er lastet.');
+  const container = document.createElement('div');
+  container.style.cssText = 'width:190mm;background:white;color:#17202a;font:12px Arial,sans-serif;line-height:1.45;padding:0;';
+  container.innerHTML = byggLesbarRapport(eksport.data);
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;z-index:-1;';
+  host.appendChild(container);document.body.appendChild(host);
+  try {
+    await Promise.all(Array.from(container.querySelectorAll('img')).map(img => new Promise((resolve,reject)=>{
+      const timer = setTimeout(()=>reject(Error('Et bilde kunne ikke lastes innen tidsgrensen.')),20000);
+      const done=()=>{clearTimeout(timer);img.naturalWidth ? resolve():reject(Error('Et bilde kunne ikke lastes.'));};
+      if(img.complete) done(); else {img.onload=done;img.onerror=()=>{clearTimeout(timer);reject(Error('Et bilde kunne ikke lastes.'));};}
+    })));
+    return await html2pdf().set({margin:[12,10,12,10],filename:eksport.filnavn.replace(/\.json$/i,'.pdf'),
+      image:{type:'jpeg',quality:0.96},html2canvas:{scale:1.5,useCORS:false,backgroundColor:'#ffffff',logging:false},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','figure','h2','h3']}}).from(container).outputPdf('blob');
+  } finally {host.remove();}
+}
+function lastNedRapportBlob(blob, navn) {
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=navn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function lagreLokalt() {
+  if(lokalEksportPagar) return;
+  lokalEksportPagar=true;
+  try {
+    if(!validerAktivFase()) return;
+    const eksport=klargjorJsonEksport();
+    // Frys begge dokumenter foer asynkron PDF-generering.
+    eksport.data=JSON.parse(eksport.tekst);
+    if(!eksport.data.metadata.modeller.length && !confirm('Ingen modeller er valgt. Rapportene vil mangle modellkobling. Lagre likevel?')) return;
+    setStatus('Genererer PDF med bilder og kommentarer. Vent med aa endre kontrollen.', 'warn');
+    let pdf;
+    try { pdf=await genererRapportPdf(eksport); }
+    catch(err) {
+      if(confirm('PDF kunne ikke genereres: '+err.message+'\nVil du likevel laste ned JSON som sikkerhetskopi?')) {
+        lastNedRapportBlob(eksport.blob,eksport.filnavn);
+        setStatus('Bare JSON-nedlasting startet. PDF mangler. Ingen opplasting.', 'warn');
+      } else setStatus('Eksport avbrutt. Ingen filer lastet ned.', 'warn');
+      return;
+    }
+    lastNedRapportBlob(eksport.blob,eksport.filnavn);
+    lastNedRapportBlob(pdf,eksport.filnavn.replace(/\.json$/i,'.pdf'));
+    setStatus('Nedlasting av JSON og PDF startet. Tillat flere nedlastinger dersom nettleseren spoer. Kontroller at begge filer er lagret. Ingen opplasting.', 'ok');
+  } catch(err) {setStatus('Eksport feilet: '+err.message,'error');}
+  finally {lokalEksportPagar=false;}
+}
+async function eksporterPDF() {
+  if(lokalEksportPagar) return;
+  lokalEksportPagar=true;
+  try {
+    if(!validerAktivFase()) return;
+    const eksport=klargjorJsonEksport();eksport.data=JSON.parse(eksport.tekst);
+    const pdf=await genererRapportPdf(eksport);
+    lastNedRapportBlob(pdf,eksport.filnavn.replace(/\.json$/i,'.pdf'));
+    setStatus('PDF-nedlasting startet. Ingen opplasting.', 'ok');
+  } catch(err) {setStatus('PDF feilet: '+err.message,'error');}
+  finally {lokalEksportPagar=false;}
 }
 
 function lastInnFil(event) {
